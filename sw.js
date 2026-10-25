@@ -1,5 +1,5 @@
 // Service Worker for TimeMark Photo Stamper
-const CACHE_NAME = 'timemark-stamper-v1';
+const CACHE_NAME = 'timemark-stamper-v2.1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
