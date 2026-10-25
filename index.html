@@ -13,10 +13,10 @@
   <meta name="apple-mobile-web-app-title" content="TimeMark">
   <link rel="apple-touch-icon" href="icon-192.png">
 
-  <!-- Google Fonts: Oswald (Clock), Plus Jakarta Sans (Clean modern body) -->
+  <!-- Google Fonts: Bebas Neue (TimeMark condensed clock), Barlow Condensed, Oswald, Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@600;700&family=Oswald:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="styles.css">
   
@@ -316,6 +316,21 @@
 
           <label class="tm-field-label mt-2">Số điện thoại / Người phụ trách</label>
           <input type="text" id="editPhone" class="tm-input" placeholder="0912 345 678">
+
+          <!-- TimeMark Branding & Security Code Toggles -->
+          <div class="tm-toggle-group mt-2">
+            <label class="tm-checkbox-row">
+              <input type="checkbox" id="chkShowTimemarkLogo" checked>
+              <span>Hiện logo "Timemark 100% Chân thực" góc dưới phải</span>
+            </label>
+            <label class="tm-checkbox-row mt-1">
+              <input type="checkbox" id="chkShowVerifiedCode" checked>
+              <span>Hiện mã bảo mật viền phải (Timemark Verified)</span>
+            </label>
+          </div>
+
+          <label class="tm-field-label mt-2">Mã xác thực TimeMark:</label>
+          <input type="text" id="editVerifyCode" class="tm-input" placeholder="19949LP99EHX14">
         </div>
 
         <!-- Position & Size -->

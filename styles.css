@@ -718,6 +718,31 @@ html, body {
   color: var(--tm-text-secondary);
 }
 
+.tm-toggle-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #11151e;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tm-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
+.tm-checkbox-row input[type="checkbox"] {
+  accent-color: var(--tm-blue-accent);
+  width: 16px;
+  height: 16px;
+}
+
 .tm-input {
   width: 100%;
   background: #11151e;
@@ -734,7 +759,32 @@ html, body {
   border-color: var(--tm-blue-accent);
 }
 
-textarea.tm-input {
+textarea.tm-toggle-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #11151e;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tm-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
+.tm-checkbox-row input[type="checkbox"] {
+  accent-color: var(--tm-blue-accent);
+  width: 16px;
+  height: 16px;
+}
+
+.tm-input {
   resize: vertical;
   min-height: 54px;
 }

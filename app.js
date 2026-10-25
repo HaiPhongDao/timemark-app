@@ -1,6 +1,6 @@
 /**
  * TimeMark Camera & Watermark Mobile App Engine
- * Recreates the exact TimeMark watermark and mobile user experience
+ * Recreates the EXACT TimeMark watermark, branding & mobile experience
  */
 
 (() => {
@@ -8,7 +8,7 @@
 
   // --- STATE ---
   const state = {
-    currentImage: null, // { file, imgElement, width, height, parsedDate, lat, lng, address }
+    currentImage: null, // { file, imgElement, width, height, parsedDate, lat, lng }
     template: 'time_location', // time_location | attendance | service | completed | project_report
     
     // Watermark Content
@@ -18,10 +18,15 @@
     details: 'Kiểm tra an ninh & tuần tra',
     phone: '0912 345 678',
     
+    // TimeMark Branding & Security
+    showTimemarkLogo: true,
+    showVerifiedCode: true,
+    verifyCode: '19949LP99EHX14',
+    
     // Style & Placement
     position: 'bottom-left',
     scale: 100, // percentage
-    amberColor: '#E5A93C', // Signature TimeMark Amber Bar
+    amberColor: '#FFC333', // Exact TimeMark Golden Amber (RGB: 255, 195, 51)
     textColor: '#FFFFFF'
   };
 
@@ -64,6 +69,9 @@
     editTitle: document.getElementById('editTitle'),
     editDetails: document.getElementById('editDetails'),
     editPhone: document.getElementById('editPhone'),
+    chkShowTimemarkLogo: document.getElementById('chkShowTimemarkLogo'),
+    chkShowVerifiedCode: document.getElementById('chkShowVerifiedCode'),
+    editVerifyCode: document.getElementById('editVerifyCode'),
     posButtons: document.querySelectorAll('.tm-pos-btn'),
     rangeScale: document.getElementById('rangeScale'),
     valScale: document.getElementById('valScale'),
@@ -73,18 +81,26 @@
   };
 
   // --- INITIALIZATION ---
-  function init() {
+  async function init() {
+    // Wait for Google Fonts to be ready so canvas renders crisp Bebas Neue / Barlow
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => renderCanvas());
+    }
+
     // Set initial date/time to now
     syncDateTimeInput();
     DOM.editAddress.value = state.address;
     DOM.editTitle.value = state.title;
     DOM.editDetails.value = state.details;
     DOM.editPhone.value = state.phone;
+    DOM.chkShowTimemarkLogo.checked = state.showTimemarkLogo;
+    DOM.chkShowVerifiedCode.checked = state.showVerifiedCode;
+    DOM.editVerifyCode.value = state.verifyCode;
 
     // Setup event listeners
     bindEvents();
 
-    // Auto load a sample image so user sees the exact TimeMark look immediately
+    // Auto load a sample photo so user sees the exact TimeMark look immediately
     loadSamplePhoto();
   }
 
@@ -150,6 +166,7 @@
         DOM.posButtons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         state.position = btn.dataset.pos;
+        renderCanvas();
       });
     });
 
@@ -240,6 +257,10 @@
           DOM.btnUseExifDate.disabled = true;
         }
 
+        // Generate a matching random verification code for this photo
+        state.verifyCode = Math.floor(10000 + Math.random() * 90000) + 'LP' + Math.floor(10 + Math.random() * 90) + 'EHX' + Math.floor(10 + Math.random() * 90);
+        DOM.editVerifyCode.value = state.verifyCode;
+
         // Hide tap placeholder, show floating actions
         DOM.tapToPickOverlay.style.display = 'none';
         DOM.floatingActions.style.display = 'flex';
@@ -303,29 +324,16 @@
 
   // --- SAMPLE PHOTO CREATOR ---
   function loadSamplePhoto() {
-    const w = 1080;
-    const h = 1920; // 9:16 vertical phone aspect ratio
+    const w = 768;
+    const h = 1024; // 3:4 aspect ratio matching the user's uploaded TimeMark photo
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = w;
     tempCanvas.height = h;
     const ctx = tempCanvas.getContext('2d');
 
-    // Realistic night/evening background like in the user's screenshot
-    const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, '#000000');
-    grad.addColorStop(0.5, '#070a0f');
-    grad.addColorStop(0.85, '#0b1118');
-    grad.addColorStop(1, '#111923');
-    ctx.fillStyle = grad;
+    // Pitch black background identical to the user's test photos
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, w, h);
-
-    // Subtle architecture lights in distance
-    ctx.fillStyle = 'rgba(255, 230, 160, 0.4)';
-    for (let i = 0; i < 40; i++) {
-      const x = (i * 37) % w;
-      const y = h * 0.45 + ((i * 53) % (h * 0.25));
-      ctx.fillRect(x, y, 3, 3);
-    }
 
     const img = new Image();
     img.onload = () => {
@@ -340,7 +348,7 @@
       DOM.floatingActions.style.display = 'flex';
       renderCanvas();
     };
-    img.src = tempCanvas.toDataURL('image/jpeg', 0.9);
+    img.src = tempCanvas.toDataURL('image/jpeg', 0.95);
   }
 
   // --- EDIT MODAL HANDLING ---
@@ -350,6 +358,9 @@
     DOM.editTitle.value = state.title;
     DOM.editDetails.value = state.details;
     DOM.editPhone.value = state.phone;
+    DOM.chkShowTimemarkLogo.checked = state.showTimemarkLogo;
+    DOM.chkShowVerifiedCode.checked = state.showVerifiedCode;
+    DOM.editVerifyCode.value = state.verifyCode;
     DOM.rangeScale.value = state.scale;
     DOM.valScale.textContent = `${state.scale}%`;
     DOM.editModalOverlay.classList.add('active');
@@ -367,6 +378,9 @@
     state.title = DOM.editTitle.value.trim();
     state.details = DOM.editDetails.value.trim();
     state.phone = DOM.editPhone.value.trim();
+    state.showTimemarkLogo = DOM.chkShowTimemarkLogo.checked;
+    state.showVerifiedCode = DOM.chkShowVerifiedCode.checked;
+    state.verifyCode = DOM.editVerifyCode.value.trim() || '19949LP99EHX14';
     closeEditModal();
     renderCanvas();
     showToast("Đã cập nhật nội dung tem!", "success");
@@ -390,9 +404,8 @@
     // 1. Draw base photo
     ctx.drawImage(img, 0, 0, w, h);
 
-    // 2. Proportional scale factor based on image resolution
-    // Base 1080p width = 1.0 multiplier
-    const baseScale = Math.min(w, h) / 1080;
+    // 2. Base scale: Reference width 768px = 1.0 multiplier
+    const baseScale = w / 768;
     const userScale = state.scale / 100;
     const s = baseScale * userScale;
 
@@ -402,10 +415,10 @@
     const minutes = String(d.getMinutes()).padStart(2, '0');
     const timeStr = `${hours}:${minutes}`;
 
-    const day = String(d.getDate()).padStart(2, '0');
+    const day = d.getDate();
     const month = d.getMonth() + 1;
     const year = d.getFullYear();
-    // TimeMark format: "26 Tháng 10,2026"
+    // TimeMark exact format: "26 Tháng 10,2026" (no space after comma)
     const dateLineStr = `${day} Tháng ${month},${year}`;
     const dayOfWeekStr = VN_DAYS[d.getDay()];
 
@@ -431,85 +444,95 @@
         renderTemplateTimeLocation(ctx, w, h, s, timeStr, dateLineStr, dayOfWeekStr, state.address);
     }
     ctx.restore();
+
+    // 3. Render Right-Edge Verified Security Code if enabled
+    if (state.showVerifiedCode) {
+      renderRightEdgeVerified(ctx, w, h, s, state.verifyCode);
+    }
+
+    // 4. Render Bottom-Right Timemark Brand Logo if enabled
+    if (state.showTimemarkLogo) {
+      renderBottomRightTimemarkLogo(ctx, w, h, s);
+    }
   }
 
   /**
-   * TEMPLATE 1: THỜI GIAN & VỊ TRÍ (The exact signature TimeMark watermark in screenshot)
-   * Format:
-   * 03:57 | 26 Tháng 10,2026
+   * TEMPLATE 1: THỜI GIAN & VỊ TRÍ
+   * Pixel-exact replica of genuine TimeMark watermark:
+   * 04:07 | 26 Tháng 10,2026
    *       | Thứ Hai
    * West Bay B - Kđt Ecopark KĐT Ecopark,
    * X.Phụng Công, Hưng Yên
    */
   function renderTemplateTimeLocation(ctx, imgW, imgH, s, timeStr, dateStr, dayStr, address) {
-    const margin = 46 * s;
-    const timeFontSize = Math.round(92 * s);
-    const dateFontSize = Math.round(26 * s);
-    const addrFontSize = Math.round(24 * s);
-    const lineGap = Math.round(34 * s);
+    const margin = 22 * s;
+    const clockHeight = 76 * s;
+    const clockFontSize = Math.round(92 * s);
+    const dateFontSize = Math.round(23 * s);
+    const dayFontSize = Math.round(20 * s);
+    const addrFontSize = Math.round(22 * s);
+    const lineGap = Math.round(28 * s);
 
-    // Setup text shadow so it's razor-sharp legible over ANY background
+    // Subtle drop shadow identical to TimeMark
     ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
-    ctx.shadowBlur = 6 * s;
+    ctx.shadowBlur = 4 * s;
     ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 2 * s;
+    ctx.shadowOffsetY = 1.5 * s;
 
-    // Measure time text width
-    ctx.font = `600 ${timeFontSize}px "Oswald", "Plus Jakarta Sans", sans-serif`;
-    const timeWidth = ctx.measureText(timeStr).width;
-
-    // Amber bar dimensions
-    const barWidth = 3.5 * s;
-    const barHeight = timeFontSize * 0.88;
-    const barGap = 16 * s;
-
-    // Wrap address text
-    ctx.font = `500 ${addrFontSize}px "Plus Jakarta Sans", sans-serif`;
-    const maxAddrWidth = Math.min(imgW - margin * 2, 700 * s);
+    // Wrap address text (matching exact break in photo)
+    ctx.font = `500 ${addrFontSize}px "Plus Jakarta Sans", -apple-system, sans-serif`;
+    const maxAddrWidth = Math.min(imgW - margin * 2 - (150 * s), 560 * s);
     const addrLines = [];
     address.split('\n').forEach(part => {
       const wrapped = wrapText(ctx, part.trim(), maxAddrWidth);
       wrapped.forEach(l => addrLines.push(l));
     });
 
-    // Total height calculation
-    const headerHeight = timeFontSize;
-    const totalHeight = headerHeight + (18 * s) + (addrLines.length * lineGap);
+    // Total watermark height calculation
+    const totalHeight = clockHeight + (27 * s) + (addrLines.length * lineGap);
+    const startX = margin;
+    // Bottom alignment: sits exactly 25px * s above bottom edge
+    const startY = imgH - totalHeight - (25 * s);
 
-    // Positioning
-    const { startX, startY } = calculatePosition(imgW, imgH, margin, totalHeight, state.position);
-
-    // 1. Draw Big Time "03:57"
-    ctx.font = `600 ${timeFontSize}px "Oswald", "Plus Jakarta Sans", sans-serif`;
+    // 1. Draw Condensed Clock "04:07"
+    // Preferred font: Bebas Neue, then Barlow Condensed, then Oswald
+    ctx.font = `400 ${clockFontSize}px "Bebas Neue", "Barlow Condensed", "Oswald", sans-serif`;
     ctx.fillStyle = state.textColor;
-    ctx.fillText(timeStr, startX, startY + timeFontSize * 0.85);
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+    ctx.fillText(timeStr, startX, startY + clockHeight * 0.94);
 
-    // 2. Draw Amber Vertical Bar "|"
-    const barX = startX + timeWidth + barGap;
-    const barY = startY + (timeFontSize * 0.05);
+    const timeWidth = ctx.measureText(timeStr).width;
+
+    // 2. Draw Golden Amber Vertical Bar "|"
+    const barX = startX + timeWidth + (12 * s);
+    const barY = startY;
+    const barWidth = 2.5 * s;
+    const barHeight = 75 * s;
 
     ctx.save();
-    ctx.fillStyle = state.amberColor;
-    ctx.shadowColor = 'transparent'; // Clean bar
-    drawRoundedBar(ctx, barX, barY, barWidth, barHeight, 2 * s);
+    ctx.fillStyle = state.amberColor; // #FFC333
+    ctx.shadowColor = 'transparent';
+    drawRoundedBar(ctx, barX, barY, barWidth, barHeight, 1 * s);
     ctx.fill();
     ctx.restore();
 
-    // 3. Draw Date & Day of Week stacked next to bar
-    const textNextToBarX = barX + barWidth + barGap;
-    ctx.font = `600 ${dateFontSize}px "Plus Jakarta Sans", sans-serif`;
-    ctx.fillStyle = state.textColor;
+    // 3. Draw Date & Day of Week
+    const textNextToBarX = barX + barWidth + (14 * s);
 
     // Line 1: Date "26 Tháng 10,2026"
-    ctx.fillText(dateStr, textNextToBarX, barY + dateFontSize * 0.95);
+    ctx.font = `600 ${dateFontSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillStyle = state.textColor;
+    ctx.fillText(dateStr, textNextToBarX, barY + dateFontSize * 0.92);
 
-    // Line 2: Day "Thứ Hai"
-    ctx.fillText(dayStr, textNextToBarX, barY + (barHeight * 0.88));
+    // Line 2: Day of Week "Thứ Hai" (aligned with bottom of amber bar)
+    ctx.font = `500 ${dayFontSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillText(dayStr, textNextToBarX, barY + barHeight - (2 * s));
 
     // 4. Draw Address Lines below
-    let curAddrY = startY + timeFontSize + (16 * s);
+    let curAddrY = startY + clockHeight + (27 * s);
     ctx.font = `500 ${addrFontSize}px "Plus Jakarta Sans", sans-serif`;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
 
     addrLines.forEach(line => {
       ctx.fillText(line, startX, curAddrY + addrFontSize * 0.85);
@@ -518,47 +541,104 @@
   }
 
   /**
-   * TEMPLATE 2: ĐIỂM DANH (Yellow Tag Attendance)
+   * RIGHT-EDGE VERIFIED CODE (TIMEMARK SECURITY CODE)
+   * Rotated 90 degrees reading along the right border:
+   * 🛡 19949LP99EHX14  Timemark Verified
+   */
+  function renderRightEdgeVerified(ctx, imgW, imgH, s, verifyCode) {
+    ctx.save();
+    const rightX = imgW - (12 * s);
+    // Center vertically along right border (from Y ~290 to Y ~500)
+    const centerY = imgH * 0.40;
+
+    ctx.translate(rightX, centerY);
+    ctx.rotate(-Math.PI / 2); // Rotate -90 degrees
+
+    ctx.font = `500 ${Math.round(11.5 * s)}px "JetBrains Mono", "Plus Jakarta Sans", monospace`;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+    ctx.shadowBlur = 3 * s;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const text = `🛡 ${verifyCode}  Timemark Verified`;
+    ctx.fillText(text, 0, 0);
+
+    ctx.restore();
+  }
+
+  /**
+   * BOTTOM-RIGHT TIMEMARK BRAND LOGO
+   * Timemark (in #FFC333 Golden Amber)
+   * 100% Chân thực (in rgba(255,255,255,0.75))
+   */
+  function renderBottomRightTimemarkLogo(ctx, imgW, imgH, s) {
+    ctx.save();
+    const rightMargin = 14 * s;
+    const bottomMargin = 25 * s;
+    const posX = imgW - rightMargin;
+    const posY = imgH - bottomMargin;
+
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'alphabetic';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+    ctx.shadowBlur = 4 * s;
+
+    // Line 2: "100% Chân thực" (bottom line)
+    const subFontSize = Math.round(11.5 * s);
+    ctx.font = `500 ${subFontSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.fillText('100% Chân thực', posX, posY);
+
+    // Line 1: "Timemark" (top line)
+    const titleFontSize = Math.round(19 * s);
+    ctx.font = `700 ${titleFontSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillStyle = state.amberColor; // #FFC333
+    ctx.fillText('Timemark', posX, posY - (15 * s));
+
+    ctx.restore();
+  }
+
+  /**
+   * TEMPLATE 2: ĐIỂM DANH
    */
   function renderTemplateAttendance(ctx, imgW, imgH, s, timeStr, dateStr, address) {
-    const margin = 46 * s;
-    const tagFontSize = Math.round(22 * s);
-    const timeFontSize = Math.round(28 * s);
-    const bodyFontSize = Math.round(24 * s);
-    const lineGap = Math.round(34 * s);
+    const margin = 22 * s;
+    const tagFontSize = Math.round(20 * s);
+    const timeFontSize = Math.round(24 * s);
+    const bodyFontSize = Math.round(22 * s);
+    const lineGap = Math.round(28 * s);
 
     ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
-    ctx.shadowBlur = 6 * s;
+    ctx.shadowBlur = 4 * s;
 
-    // Measure widths
     ctx.font = `800 ${tagFontSize}px "Plus Jakarta Sans", sans-serif`;
-    const tagW = ctx.measureText("Điểm danh").width + (16 * s);
-    const tagH = 34 * s;
+    const tagW = ctx.measureText("Điểm danh").width + (14 * s);
+    const tagH = 30 * s;
 
     ctx.font = `700 ${timeFontSize}px "JetBrains Mono", monospace`;
-    const timeW = ctx.measureText(timeStr).width + (18 * s);
+    const timeW = ctx.measureText(timeStr).width + (16 * s);
 
-    // Wrap address
-    ctx.font = `500 ${bodyFontSize}px "Plus Jakarta Sans", sans-serif`;
-    const maxAddrWidth = Math.min(imgW - margin * 2 - (24 * s), 700 * s);
+    const maxAddrWidth = Math.min(imgW - margin * 2 - (150 * s), 560 * s);
     const addrLines = [];
     address.split('\n').forEach(part => {
       const wrapped = wrapText(ctx, part.trim(), maxAddrWidth);
       wrapped.forEach(l => addrLines.push(l));
     });
 
-    const totalHeight = tagH + (16 * s) + lineGap + (addrLines.length * lineGap);
-    const { startX, startY } = calculatePosition(imgW, imgH, margin, totalHeight, state.position);
+    const totalHeight = tagH + (14 * s) + lineGap + (addrLines.length * lineGap);
+    const startX = margin;
+    const startY = imgH - totalHeight - (25 * s);
 
     // Tag: [Điểm danh]
     ctx.save();
     ctx.fillStyle = '#f59e0b';
     ctx.shadowColor = 'transparent';
-    drawRoundedBar(ctx, startX, startY, tagW, tagH, 6 * s);
+    drawRoundedBar(ctx, startX, startY, tagW, tagH, 5 * s);
     ctx.fill();
     ctx.fillStyle = '#000000';
     ctx.font = `800 ${tagFontSize}px "Plus Jakarta Sans", sans-serif`;
-    ctx.fillText("Điểm danh", startX + (8 * s), startY + tagFontSize * 1.15);
+    ctx.fillText("Điểm danh", startX + (7 * s), startY + tagFontSize * 1.1);
     ctx.restore();
 
     // Time Box: [23:40]
@@ -566,26 +646,25 @@
     const timeBoxX = startX + tagW + (6 * s);
     ctx.fillStyle = '#ffffff';
     ctx.shadowColor = 'transparent';
-    drawRoundedBar(ctx, timeBoxX, startY, timeW, tagH, 6 * s);
+    drawRoundedBar(ctx, timeBoxX, startY, timeW, tagH, 5 * s);
     ctx.fill();
     ctx.fillStyle = '#000000';
     ctx.font = `800 ${timeFontSize}px "JetBrains Mono", monospace`;
-    ctx.fillText(timeStr, timeBoxX + (8 * s), startY + timeFontSize * 0.95);
+    ctx.fillText(timeStr, timeBoxX + (7 * s), startY + timeFontSize * 0.95);
     ctx.restore();
 
     // Body with Amber Vertical Line
-    const bodyStartY = startY + tagH + (12 * s);
-    const barHeight = (1 + addrLines.length) * lineGap - (8 * s);
-    const barX = startX;
+    const bodyStartY = startY + tagH + (10 * s);
+    const barHeight = (1 + addrLines.length) * lineGap - (6 * s);
 
     ctx.save();
     ctx.fillStyle = state.amberColor;
     ctx.shadowColor = 'transparent';
-    drawRoundedBar(ctx, barX, bodyStartY, 3.5 * s, barHeight, 2 * s);
+    drawRoundedBar(ctx, startX, bodyStartY, 2.5 * s, barHeight, 1 * s);
     ctx.fill();
     ctx.restore();
 
-    const textX = barX + (14 * s);
+    const textX = startX + (12 * s);
     let curY = bodyStartY;
 
     ctx.font = `600 ${bodyFontSize}px "Plus Jakarta Sans", sans-serif`;
@@ -604,34 +683,33 @@
    * TEMPLATE 3: DỊCH VỤ / CÔNG VIỆC
    */
   function renderTemplateService(ctx, imgW, imgH, s, title, dateStr, details, phone) {
-    const margin = 46 * s;
-    const titleFontSize = Math.round(30 * s);
-    const bodyFontSize = Math.round(23 * s);
-    const lineGap = Math.round(32 * s);
+    const margin = 22 * s;
+    const titleFontSize = Math.round(26 * s);
+    const bodyFontSize = Math.round(21 * s);
+    const lineGap = Math.round(28 * s);
 
     ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
-    ctx.shadowBlur = 6 * s;
+    ctx.shadowBlur = 4 * s;
 
-    const totalHeight = titleFontSize + (16 * s) + (3 * lineGap);
-    const { startX, startY } = calculatePosition(imgW, imgH, margin, totalHeight, state.position);
+    const totalHeight = titleFontSize + (14 * s) + (3 * lineGap);
+    const startX = margin;
+    const startY = imgH - totalHeight - (25 * s);
 
-    // Title
     ctx.font = `700 ${titleFontSize}px "Plus Jakarta Sans", sans-serif`;
     ctx.fillStyle = '#ffffff';
     ctx.fillText(title || 'Tên dịch vụ', startX, startY + titleFontSize * 0.85);
 
-    // Amber bar
-    const bodyStartY = startY + titleFontSize + (12 * s);
+    const bodyStartY = startY + titleFontSize + (10 * s);
     const barHeight = (3 * lineGap) - (6 * s);
 
     ctx.save();
     ctx.fillStyle = state.amberColor;
     ctx.shadowColor = 'transparent';
-    drawRoundedBar(ctx, startX, bodyStartY, 3.5 * s, barHeight, 2 * s);
+    drawRoundedBar(ctx, startX, bodyStartY, 2.5 * s, barHeight, 1 * s);
     ctx.fill();
     ctx.restore();
 
-    const textX = startX + (14 * s);
+    const textX = startX + (12 * s);
     let curY = bodyStartY;
 
     ctx.font = `600 ${bodyFontSize}px "Plus Jakarta Sans", sans-serif`;
@@ -646,55 +724,53 @@
   }
 
   /**
-   * TEMPLATE 4: ĐÃ HOÀN THÀNH (Task Completed)
+   * TEMPLATE 4: ĐÃ HOÀN THÀNH
    */
   function renderTemplateCompleted(ctx, imgW, imgH, s, timeStr, dateStr, address) {
-    const margin = 46 * s;
-    const badgeFontSize = Math.round(22 * s);
-    const titleFontSize = Math.round(28 * s);
-    const bodyFontSize = Math.round(24 * s);
-    const lineGap = Math.round(34 * s);
+    const margin = 22 * s;
+    const badgeFontSize = Math.round(20 * s);
+    const titleFontSize = Math.round(25 * s);
+    const bodyFontSize = Math.round(21 * s);
+    const lineGap = Math.round(28 * s);
 
     ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
-    ctx.shadowBlur = 6 * s;
+    ctx.shadowBlur = 4 * s;
 
     ctx.font = `800 ${badgeFontSize}px "Plus Jakarta Sans", sans-serif`;
     const badgeText = `${timeStr} ✓`;
-    const badgeW = ctx.measureText(badgeText).width + (18 * s);
-    const badgeH = 32 * s;
+    const badgeW = ctx.measureText(badgeText).width + (16 * s);
+    const badgeH = 28 * s;
 
-    const totalHeight = badgeH + (8 * s) + titleFontSize + (14 * s) + (2 * lineGap);
-    const { startX, startY } = calculatePosition(imgW, imgH, margin, totalHeight, state.position);
+    const totalHeight = badgeH + (8 * s) + titleFontSize + (12 * s) + (2 * lineGap);
+    const startX = margin;
+    const startY = imgH - totalHeight - (25 * s);
 
-    // Green badge: [09:30 ✓]
     ctx.save();
     ctx.fillStyle = '#00c06d';
     ctx.shadowColor = 'transparent';
-    drawRoundedBar(ctx, startX, startY, badgeW, badgeH, 6 * s);
+    drawRoundedBar(ctx, startX, startY, badgeW, badgeH, 5 * s);
     ctx.fill();
     ctx.fillStyle = '#ffffff';
     ctx.font = `800 ${badgeFontSize}px "Plus Jakarta Sans", sans-serif`;
-    ctx.fillText(badgeText, startX + (9 * s), startY + badgeFontSize * 1.05);
+    ctx.fillText(badgeText, startX + (8 * s), startY + badgeFontSize * 1.05);
     ctx.restore();
 
-    // Bold title: "Đã hoàn thành"
-    const titleY = startY + badgeH + (12 * s);
+    const titleY = startY + badgeH + (10 * s);
     ctx.font = `800 ${titleFontSize}px "Plus Jakarta Sans", sans-serif`;
     ctx.fillStyle = '#ffffff';
     ctx.fillText("Đã hoàn thành", startX, titleY + titleFontSize * 0.85);
 
-    // Amber bar below
-    const bodyStartY = titleY + titleFontSize + (10 * s);
+    const bodyStartY = titleY + titleFontSize + (8 * s);
     const barHeight = (2 * lineGap) - (6 * s);
 
     ctx.save();
     ctx.fillStyle = state.amberColor;
     ctx.shadowColor = 'transparent';
-    drawRoundedBar(ctx, startX, bodyStartY, 3.5 * s, barHeight, 2 * s);
+    drawRoundedBar(ctx, startX, bodyStartY, 2.5 * s, barHeight, 1 * s);
     ctx.fill();
     ctx.restore();
 
-    const textX = startX + (14 * s);
+    const textX = startX + (12 * s);
     let curY = bodyStartY;
 
     ctx.font = `600 ${bodyFontSize}px "Plus Jakarta Sans", sans-serif`;
@@ -707,34 +783,33 @@
   }
 
   /**
-   * TEMPLATE 5: CÔNG TRÌNH & DỰ ÁN (Detailed Project Format)
+   * TEMPLATE 5: CÔNG TRÌNH & DỰ ÁN
    */
   function renderTemplateProjectReport(ctx, imgW, imgH, s, timeStr, dateStr, title, details, address) {
-    const margin = 46 * s;
-    const timeFontSize = Math.round(64 * s);
-    const bodyFontSize = Math.round(22 * s);
-    const lineGap = Math.round(30 * s);
+    const margin = 22 * s;
+    const timeFontSize = Math.round(58 * s);
+    const bodyFontSize = Math.round(20 * s);
+    const lineGap = Math.round(26 * s);
 
     ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
-    ctx.shadowBlur = 6 * s;
+    ctx.shadowBlur = 4 * s;
 
-    const totalHeight = timeFontSize + (16 * s) + (4 * lineGap);
-    const { startX, startY } = calculatePosition(imgW, imgH, margin, totalHeight, state.position);
+    const totalHeight = timeFontSize + (14 * s) + (4 * lineGap);
+    const startX = margin;
+    const startY = imgH - totalHeight - (25 * s);
 
-    // Time
     ctx.font = `700 ${timeFontSize}px "JetBrains Mono", sans-serif`;
     ctx.fillStyle = '#ffffff';
     ctx.fillText(timeStr, startX, startY + timeFontSize * 0.85);
 
-    // Horizontal Accent Line
-    const lineY = startY + timeFontSize + (8 * s);
+    const lineY = startY + timeFontSize + (6 * s);
     ctx.save();
     ctx.fillStyle = '#0084ff';
     ctx.shadowColor = 'transparent';
-    ctx.fillRect(startX, lineY, 260 * s, 3.5 * s);
+    ctx.fillRect(startX, lineY, 240 * s, 3 * s);
     ctx.restore();
 
-    let curY = lineY + (14 * s);
+    let curY = lineY + (12 * s);
     ctx.font = `600 ${bodyFontSize}px "Plus Jakarta Sans", sans-serif`;
     ctx.fillStyle = '#ffffff';
 
@@ -751,35 +826,6 @@
   }
 
   // --- DRAWING HELPERS ---
-  function calculatePosition(imgW, imgH, margin, totalH, pos) {
-    let startX = margin;
-    let startY = imgH - totalH - margin;
-
-    switch (pos) {
-      case 'bottom-left':
-        startX = margin;
-        startY = imgH - totalH - margin;
-        break;
-      case 'bottom-center':
-        startX = imgW * 0.15;
-        startY = imgH - totalH - margin;
-        break;
-      case 'bottom-right':
-        startX = imgW * 0.35;
-        startY = imgH - totalH - margin;
-        break;
-      case 'top-left':
-        startX = margin;
-        startY = margin;
-        break;
-      case 'top-right':
-        startX = imgW * 0.35;
-        startY = margin;
-        break;
-    }
-    return { startX, startY };
-  }
-
   function drawRoundedBar(ctx, x, y, width, height, radius) {
     ctx.beginPath();
     ctx.moveTo(x + radius, y);
@@ -842,7 +888,7 @@
 
         setTimeout(() => URL.revokeObjectURL(link.href), 4000);
         showToast("Đã lưu ảnh vào máy thành công! 🎉", "success");
-      }, 'image/jpeg', 0.95);
+      }, 'image/jpeg', 0.96);
     }, 100);
   }
 
