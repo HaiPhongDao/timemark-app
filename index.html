@@ -2,625 +2,355 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TimeMark Photo Stamper - Đóng dấu ngày giờ & thông tin ảnh</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>TimeMark Camera & Watermark</title>
   
   <!-- PWA & Mobile Web App Meta Tags -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="theme-color" content="#000000">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="TimeMark">
   <link rel="apple-touch-icon" href="icon-192.png">
 
-  <link rel="stylesheet" href="styles.css">
+  <!-- Google Fonts: Oswald (Clock), Plus Jakarta Sans (Clean modern body) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
-  <!-- Vendor libraries (local offline copies) -->
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- Vendor libraries (offline) -->
   <script src="vendor/exifr.full.umd.js"></script>
   <script src="vendor/jszip.min.js"></script>
 </head>
-<body class="theme-dark">
-  <div class="app-container">
-    <!-- TOP HEADER -->
-    <header class="app-header">
-      <div class="header-left">
-        <div class="brand-badge">
-          <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
+<body class="mobile-timemark">
+  <div class="timemark-app-wrapper">
+
+    <!-- 1. TOP HEADER (TimeMark Style) -->
+    <header class="tm-top-bar">
+      <div class="tm-top-left">
+        <button class="tm-icon-btn" id="btnMenu" title="Menu">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2">
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
-          <span class="brand-title">TimeMark <span class="highlight">Stamper</span></span>
-          <span class="version-tag">Pro v2.0</span>
-        </div>
-        <p class="brand-subtitle">Chèn ngày giờ, GPS, công trình & logo lên ảnh sẵn có</p>
+        </button>
+        <button class="tm-icon-btn" id="btnFlash" title="Đèn flash">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            <line x1="2" y1="2" x2="22" y2="22"></line>
+          </svg>
+        </button>
       </div>
 
-      <div class="header-right">
-        <button id="btnResetAll" class="btn btn-ghost" title="Đặt lại toàn bộ về mặc định">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-            <path d="M3 3v5h5"></path>
+      <div class="tm-top-center">
+        <div class="tm-badge-pill" id="btnVerifyBadge">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
           </svg>
-          <span>Đặt lại</span>
-        </button>
-        <button id="btnDownloadSingle" class="btn btn-primary" disabled>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
+          <span>Xác thực ảnh</span>
+        </div>
+        <div class="tm-plus-pill">
+          <span>✦ Plus</span>
+        </div>
+      </div>
+
+      <div class="tm-top-right">
+        <button class="tm-icon-btn" id="btnPickGallery" title="Chọn ảnh từ thư viện">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
           </svg>
-          <span>Tải ảnh này</span>
         </button>
-        <button id="btnBatchDownload" class="btn btn-accent" style="display: none;">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-          </svg>
-          <span id="batchBtnText">Tải tất cả (ZIP)</span>
-        </button>
+        <input type="file" id="filePickerInput" accept="image/*" multiple hidden>
       </div>
     </header>
 
-    <!-- MAIN BODY -->
-    <main class="app-main">
-      <!-- SIDEBAR CONTROLS -->
-      <aside class="sidebar-panel">
-        <!-- 1. UPLOAD SECTION -->
-        <section class="control-card">
-          <div class="card-header">
-            <div class="card-title">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <polyline points="21 15 16 10 5 21"></polyline>
-              </svg>
-              <span>1. Chọn ảnh cần đóng dấu</span>
-            </div>
-            <span id="imageCounterBadge" class="badge badge-info" style="display: none;">0 ảnh</span>
-          </div>
-
-          <div id="dropzone" class="dropzone">
-            <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/heic" multiple hidden>
-            <div class="dropzone-content">
-              <div class="upload-icon-circle">
-                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="17 8 12 3 7 8"></polyline>
-                  <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
-              </div>
-              <p class="upload-title"><strong>Kéo thả ảnh vào đây</strong> hoặc nhấn để chọn</p>
-              <p class="upload-hint">Hỗ trợ JPG, PNG, WEBP. Chọn nhiều ảnh cùng lúc để xử lý hàng loạt.</p>
-              <button type="button" id="btnDropzoneDemo" class="btn-link mt-2">
-                ✨ Thử ngay với ảnh mẫu có sẵn
-              </button>
-            </div>
-          </div>
-
-          <!-- Thumbnails list for multiple images -->
-          <div id="thumbnailsContainer" class="thumbnails-container" style="display: none;">
-            <div class="thumbnails-header">
-              <span>Danh sách ảnh đã tải (<span id="thumbCount">0</span>)</span>
-              <button id="btnClearImages" class="btn-link-danger">Xóa hết</button>
-            </div>
-            <div id="thumbnailsList" class="thumbnails-list"></div>
-          </div>
-        </section>
-
-        <!-- 2. TEMPLATES SELECTOR -->
-        <section class="control-card">
-          <div class="card-header">
-            <div class="card-title">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="7" height="7"></rect>
-                <rect x="14" y="3" width="7" height="7"></rect>
-                <rect x="14" y="14" width="7" height="7"></rect>
-                <rect x="3" y="14" width="7" height="7"></rect>
-              </svg>
-              <span>2. Chọn mẫu tem (Template)</span>
-            </div>
-          </div>
-
-          <div class="templates-grid">
-            <div class="template-card active" data-template="construction">
-              <div class="template-badge">Phổ biến</div>
-              <div class="template-preview tpl-construction">
-                <div class="tpl-time">14:35:20</div>
-                <div class="tpl-line accent"></div>
-                <div class="tpl-line"></div>
-                <div class="tpl-line"></div>
-              </div>
-              <div class="template-name">Báo cáo Công trình</div>
-              <div class="template-desc">Chuẩn TimeMark: Bảng thông tin dự án, GPS, giờ to rõ</div>
-            </div>
-
-            <div class="template-card" data-template="classic">
-              <div class="template-preview tpl-classic">
-                <div class="tpl-bigtime">14:35</div>
-                <div class="tpl-sub">26/10/2026 • 31°C</div>
-                <div class="tpl-line"></div>
-              </div>
-              <div class="template-name">TimeMark Cổ điển</div>
-              <div class="template-desc">Đồng hồ số cỡ lớn, thời tiết, ngày tháng & địa chỉ</div>
-            </div>
-
-            <div class="template-card" data-template="inspection">
-              <div class="template-preview tpl-inspection">
-                <div class="tpl-status-tag">ĐÃ NGHIỆM THU</div>
-                <div class="tpl-line"></div>
-                <div class="tpl-line"></div>
-              </div>
-              <div class="template-name">Thẻ Nghiệm thu / Giám sát</div>
-              <div class="template-desc">Dạng thẻ ID có huy hiệu chứng nhận, logo công ty</div>
-            </div>
-
-            <div class="template-card" data-template="minimalist">
-              <div class="template-preview tpl-minimalist">
-                <div class="tpl-minitime">14:35 | 26.10.2026</div>
-                <div class="tpl-sub">TP. Hồ Chí Minh, VN</div>
-              </div>
-              <div class="template-name">Tối giản (Minimalist)</div>
-              <div class="template-desc">Chữ viền sắc nét không viền che nền, tinh tế hiện đại</div>
-            </div>
-
-            <div class="template-card" data-template="hud_gps">
-              <div class="template-preview tpl-hud">
-                <div class="tpl-crosshair">+</div>
-                <div class="tpl-coords">LAT: 10.7769° N</div>
-                <div class="tpl-coords">LNG: 106.7009° E</div>
-              </div>
-              <div class="template-name">HUD Tọa độ GPS</div>
-              <div class="template-desc">Phong cách kỹ thuật viễn thông, trắc địa, tọa độ vệ tinh</div>
-            </div>
-          </div>
-        </section>
-
-        <!-- 3. DATE & TIME SETTINGS -->
-        <section class="control-card">
-          <div class="card-header">
-            <div class="card-title">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
-              </svg>
-              <span>3. Ngày & Giờ</span>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="chkShowDateTime" checked>
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-
-          <div id="datetimeFields" class="card-body-collapsible">
-            <!-- Source status info -->
-            <div class="info-alert" id="exifDateAlert">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="16" x2="12" y2="12"></line>
-                <line x1="12" y1="8" x2="12.01" y2="8"></line>
-              </svg>
-              <span id="exifDateStatus">Chưa tải ảnh. Sẽ tự động đọc từ EXIF khi có ảnh.</span>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>Ngày & Giờ chèn:</label>
-                <input type="datetime-local" id="inputDateTime" step="1" class="form-control">
-              </div>
-            </div>
-
-            <div class="quick-btn-group">
-              <button type="button" id="btnUseExifDate" class="btn btn-sm btn-outline" title="Lấy ngày giờ chụp gốc từ ảnh" disabled>
-                📷 Giờ chụp gốc (EXIF)
-              </button>
-              <button type="button" id="btnUseCurrentDate" class="btn btn-sm btn-outline" title="Lấy thời gian ngay lúc này">
-                ⚡ Giờ hiện tại
-              </button>
-            </div>
-
-            <div class="form-row mt-2">
-              <div class="form-group flex-1">
-                <label>Định dạng hiển thị:</label>
-                <select id="selectDateFormat" class="form-control">
-                  <option value="dd/MM/yyyy HH:mm:ss">26/10/2026 14:35:20 (Chuẩn VN)</option>
-                  <option value="yyyy-MM-dd HH:mm:ss">2026-10-26 14:35:20 (ISO)</option>
-                  <option value="HH:mm:ss dd/MM/yyyy">14:35:20 - 26/10/2026</option>
-                  <option value="yyyy.MM.dd HH:mm">2026.10.26 14:35</option>
-                  <option value="dd/MM/yyyy HH:mm">26/10/2026 14:35</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-check-group mt-2">
-              <label class="checkbox-label">
-                <input type="checkbox" id="chkShowDayOfWeek" checked>
-                <span>Kèm thứ trong tuần (Thứ Hai, Thứ Ba...)</span>
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" id="chkShowSeconds" checked>
-                <span>Hiển thị giây (:ss)</span>
-              </label>
-            </div>
-          </div>
-        </section>
-
-        <!-- 4. LOCATION & GPS -->
-        <section class="control-card">
-          <div class="card-header">
-            <div class="card-title">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                <circle cx="12" cy="10" r="3"></circle>
-              </svg>
-              <span>4. Địa điểm & Tọa độ GPS</span>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="chkShowLocation" checked>
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-
-          <div id="locationFields" class="card-body-collapsible">
-            <div class="form-group">
-              <div class="label-with-action">
-                <label>Địa chỉ hiển thị:</label>
-                <button type="button" id="btnReverseGeocode" class="btn-link" title="Dùng OpenStreetMap chuyển GPS thành tên đường">
-                  🌍 Lấy tên đường từ GPS
-                </button>
-              </div>
-              <textarea id="inputAddress" rows="2" class="form-control" placeholder="Ví dụ: Số 123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh"></textarea>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>Vĩ độ (Latitude):</label>
-                <input type="text" id="inputLat" class="form-control" placeholder="10.776889">
-              </div>
-              <div class="form-group flex-1">
-                <label>Kinh độ (Longitude):</label>
-                <input type="text" id="inputLng" class="form-control" placeholder="106.700806">
-              </div>
-            </div>
-
-            <div class="quick-btn-group">
-              <button type="button" id="btnUseExifGps" class="btn btn-sm btn-outline" disabled>
-                📡 Lấy GPS từ ảnh gốc
-              </button>
-              <button type="button" id="btnBrowserGps" class="btn btn-sm btn-outline">
-                📍 Lấy vị trí thiết bị hiện tại
-              </button>
-            </div>
-
-            <div class="form-check-group mt-2">
-              <label class="checkbox-label">
-                <input type="checkbox" id="chkShowGpsCoords" checked>
-                <span>Hiển thị dòng tọa độ số (Lat, Long)</span>
-              </label>
-            </div>
-          </div>
-        </section>
-
-        <!-- 5. PROJECT & WORK NOTES -->
-        <section class="control-card">
-          <div class="card-header">
-            <div class="card-title">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-                <polyline points="10 9 9 9 8 9"></polyline>
-              </svg>
-              <span>5. Thông tin Dự án / Công việc</span>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="chkShowProjectInfo" checked>
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-
-          <div id="projectFields" class="card-body-collapsible">
-            <div class="form-group">
-              <label>Dự án / Công trình:</label>
-              <input type="text" id="inputProjectName" class="form-control" placeholder="Dự án Căn hộ Sunview Tower">
-            </div>
-
-            <div class="form-group">
-              <label>Hạng mục / Công việc:</label>
-              <input type="text" id="inputWorkItem" class="form-control" placeholder="Nghiệm thu cốt thép sàn tầng 5">
-            </div>
-
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>Người chụp / Giám sát:</label>
-                <input type="text" id="inputInspector" class="form-control" placeholder="Nguyễn Văn A (KS. Giám sát)">
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>Ghi chú thêm:</label>
-              <input type="text" id="inputNotes" class="form-control" placeholder="Đạt yêu cầu kỹ thuật TCVN">
-            </div>
-
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>Mã kiểm định / Chống giả:</label>
-                <div class="input-with-button">
-                  <input type="text" id="inputVerifyCode" class="form-control" placeholder="#TM-894210">
-                  <button type="button" id="btnGenVerifyCode" class="btn btn-sm btn-outline" title="Tạo mã ngẫu nhiên">🎲 Đổi mã</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- 6. LOGO & WATERMARK -->
-        <section class="control-card">
-          <div class="card-header">
-            <div class="card-title">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                <polyline points="2 17 12 22 22 17"></polyline>
-                <polyline points="2 12 12 17 22 12"></polyline>
-              </svg>
-              <span>6. Logo & Thương hiệu</span>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="chkShowLogo" checked>
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-
-          <div id="logoFields" class="card-body-collapsible">
-            <div class="logo-upload-box">
-              <div class="logo-preview-wrapper" id="logoPreviewWrapper">
-                <img id="logoPreviewImg" src="" alt="Logo" style="display: none;">
-                <div id="logoPlaceholder" class="logo-placeholder">
-                  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                    <polyline points="21 15 16 10 5 21"></polyline>
-                  </svg>
-                  <span>Chưa có logo</span>
-                </div>
-              </div>
-              <div class="logo-upload-actions">
-                <input type="file" id="logoInput" accept="image/png,image/jpeg,image/svg+xml" hidden>
-                <button type="button" id="btnUploadLogo" class="btn btn-sm btn-outline">Tải lên Logo (PNG/JPG)</button>
-                <button type="button" id="btnUseSampleLogo" class="btn btn-sm btn-ghost">Dùng logo mẫu</button>
-                <button type="button" id="btnRemoveLogo" class="btn btn-sm btn-link-danger" style="display: none;">Xóa logo</button>
-              </div>
-            </div>
-
-            <div class="form-row mt-2">
-              <div class="form-group flex-1">
-                <label>Kích thước logo: <span id="valLogoSize">48px</span></label>
-                <input type="range" id="rangeLogoSize" min="24" max="120" value="48" class="form-range">
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- 7. STYLE, COLORS & POSITION -->
-        <section class="control-card">
-          <div class="card-header">
-            <div class="card-title">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-              </svg>
-              <span>7. Tùy chỉnh Tem (Vị trí & Màu sắc)</span>
-            </div>
-          </div>
-
-          <!-- Position picker -->
-          <div class="form-group">
-            <label>Vị trí đặt tem:</label>
-            <div class="position-grid">
-              <button type="button" class="pos-btn" data-pos="top-left" title="Góc trên bên trái">↖ Trên Trái</button>
-              <button type="button" class="pos-btn" data-pos="top-center" title="Phía trên ở giữa">↑ Trên Giữa</button>
-              <button type="button" class="pos-btn" data-pos="top-right" title="Góc trên bên phải">↗ Trên Phải</button>
-              <button type="button" class="pos-btn active" data-pos="bottom-left" title="Góc dưới bên trái (Chuẩn TimeMark)">↙ Dưới Trái</button>
-              <button type="button" class="pos-btn" data-pos="bottom-center" title="Phía dưới ở giữa">↓ Dưới Giữa</button>
-              <button type="button" class="pos-btn" data-pos="bottom-right" title="Góc dưới bên phải">↘ Dưới Phải</button>
-            </div>
-          </div>
-
-          <!-- Scale and padding -->
-          <div class="form-row">
-            <div class="form-group flex-1">
-              <label>Kích thước tem: <span id="valScale">100%</span></label>
-              <input type="range" id="rangeScale" min="50" max="180" value="100" class="form-range">
-            </div>
-            <div class="form-group flex-1">
-              <label>Cách mép ảnh: <span id="valMargin">30px</span></label>
-              <input type="range" id="rangeMargin" min="10" max="100" value="30" class="form-range">
-            </div>
-          </div>
-
-          <!-- Background box & opacity -->
-          <div class="form-row">
-            <div class="form-group flex-1">
-              <label>Màu nền tem:</label>
-              <select id="selectBgStyle" class="form-control">
-                <option value="glass-dark">Kính tối mờ (Glass Dark)</option>
-                <option value="solid-dark">Đen đặc (Solid Black)</option>
-                <option value="navy">Xanh Navy đậm</option>
-                <option value="glass-light">Kính sáng mờ (Glass Light)</option>
-                <option value="transparent">Trong suốt (Không nền, đổ bóng)</option>
-              </select>
-            </div>
-            <div class="form-group flex-1">
-              <label>Độ mờ nền: <span id="valBgOpacity">75%</span></label>
-              <input type="range" id="rangeBgOpacity" min="0" max="100" value="75" class="form-range">
-            </div>
-          </div>
-
-          <!-- Color accents -->
-          <div class="form-row">
-            <div class="form-group flex-1">
-              <label>Màu nhấn (Accent):</label>
-              <div class="color-picker-row">
-                <input type="color" id="inputAccentColor" value="#00E5FF" class="color-picker">
-                <span class="color-hex" id="valAccentHex">#00E5FF</span>
-                <div class="preset-colors">
-                  <span class="preset-dot" style="background: #00E5FF" data-color="#00E5FF" title="Cyan TimeMark"></span>
-                  <span class="preset-dot" style="background: #FFB800" data-color="#FFB800" title="Vàng công trình"></span>
-                  <span class="preset-dot" style="background: #00E676" data-color="#00E676" title="Xanh lá"></span>
-                  <span class="preset-dot" style="background: #FF5252" data-color="#FF5252" title="Đỏ cam"></span>
-                </div>
-              </div>
-            </div>
-            <div class="form-group flex-1">
-              <label>Màu chữ chính:</label>
-              <div class="color-picker-row">
-                <input type="color" id="inputTextColor" value="#FFFFFF" class="color-picker">
-                <span class="color-hex" id="valTextHex">#FFFFFF</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- 8. EXPORT SETTINGS -->
-        <section class="control-card">
-          <div class="card-header">
-            <div class="card-title">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
-                <path d="M12 12v9"></path>
-                <path d="m8 17 4 4 4-4"></path>
-              </svg>
-              <span>8. Tùy chọn Xuất ảnh</span>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group flex-1">
-              <label>Định dạng xuất:</label>
-              <select id="selectExportFormat" class="form-control">
-                <option value="image/jpeg">JPEG (Nhẹ, độ nét cao)</option>
-                <option value="image/png">PNG (Không nén, sắc nét tuyệt đối)</option>
-              </select>
-            </div>
-            <div class="form-group flex-1" id="grpQuality">
-              <label>Chất lượng: <span id="valQuality">95%</span></label>
-              <input type="range" id="rangeQuality" min="70" max="100" value="95" class="form-range">
-            </div>
-          </div>
-
-          <div class="export-actions-bottom">
-            <button id="btnDownloadSingleBottom" class="btn btn-primary btn-lg w-100" disabled>
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              <span>Xuất & Tải ảnh này</span>
-            </button>
-            <button id="btnBatchDownloadBottom" class="btn btn-accent btn-lg w-100 mt-2" style="display: none;">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              <span>Đóng dấu & Tải tất cả ảnh (.ZIP)</span>
-            </button>
-          </div>
-        </section>
-      </aside>
-
-      <!-- PREVIEW CANVAS PANEL -->
-      <section class="preview-panel">
-        <div class="preview-toolbar">
-          <div class="image-info-bar">
-            <span id="txtImageResolution" class="info-tag">Chưa có ảnh</span>
-            <span id="txtImageSize" class="info-tag secondary">0 MB</span>
-            <span id="txtExifBadge" class="info-tag success" style="display: none;">EXIF OK</span>
-          </div>
-
-          <div class="preview-controls">
-            <button id="btnToggleCompare" class="btn btn-sm btn-ghost" title="Nhấn giữ hoặc bấm để xem ảnh gốc">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-              <span id="lblCompare">Xem ảnh gốc</span>
-            </button>
-            <button id="btnZoomFit" class="btn btn-sm btn-ghost" title="Vừa khung hình">
-              🔍 Vừa khung
-            </button>
-            <button id="btnZoom100" class="btn btn-sm btn-ghost" title="100% tỷ lệ thực">
-              1:1
-            </button>
-          </div>
-        </div>
-
-        <!-- Canvas Container -->
-        <div class="canvas-viewport" id="canvasViewport">
-          <!-- Placeholder when no image loaded -->
-          <div id="emptyStatePlaceholder" class="empty-state">
-            <div class="empty-state-graphic">
-              <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+    <!-- 2. PHOTO VIEWPORT / CAMERA VIEWER -->
+    <main class="tm-viewport-container" id="viewportContainer">
+      <div class="tm-canvas-holder" id="canvasHolder">
+        <canvas id="mainCanvas"></canvas>
+        
+        <!-- Empty / Tap to Pick Photo Hint -->
+        <div id="tapToPickOverlay" class="tm-tap-overlay">
+          <div class="tm-tap-box">
+            <div class="tm-tap-icon">
+              <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="3" ry="3"></rect>
+                <circle cx="8.5" cy="8.5" r="2"></circle>
                 <polyline points="21 15 16 10 5 21"></polyline>
               </svg>
             </div>
-            <h3>Chưa có ảnh nào được chọn</h3>
-            <p>Kéo thả ảnh vào khung bên trái hoặc nhấn nút bên dưới để bắt đầu</p>
-            <div class="empty-state-actions">
-              <button id="btnEmptyBrowse" class="btn btn-primary mt-3">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="17 8 12 3 7 8"></polyline>
-                  <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
-                <span>Chọn ảnh từ máy tính</span>
-              </button>
-              <button id="btnEmptyDemo" class="btn btn-outline mt-2">
-                ✨ Thử ngay với ảnh mẫu Demo
-              </button>
-            </div>
-          </div>
-
-          <!-- Main Interactive Canvas -->
-          <canvas id="previewCanvas" style="display: none;"></canvas>
-
-          <!-- Loading overlay -->
-          <div id="renderLoadingOverlay" class="loading-overlay" style="display: none;">
-            <div class="spinner"></div>
-            <span id="loadingMessage">Đang xử lý ảnh...</span>
+            <p class="tm-tap-title">Chạm vào đây để chọn ảnh cần chèn</p>
+            <p class="tm-tap-desc">Tự động đọc ngày giờ và vị trí từ ảnh có sẵn</p>
+            <button class="tm-btn-demo" id="btnLoadDemoImage">✨ Thử với ảnh mẫu</button>
           </div>
         </div>
+      </div>
 
-        <!-- Batch Progress Bar (Modal or Bottom banner) -->
-        <div id="batchProgressBarWrapper" class="batch-progress-wrapper" style="display: none;">
-          <div class="batch-progress-info">
-            <span id="batchProgressText">Đang đóng dấu ảnh 1/5...</span>
-            <span id="batchProgressPercent">20%</span>
-          </div>
-          <div class="progress-bar-track">
-            <div id="batchProgressBarFill" class="progress-bar-fill" style="width: 20%;"></div>
-          </div>
-        </div>
-      </section>
+      <!-- Quick Edit Floating Chip on Photo -->
+      <div class="tm-floating-actions" id="floatingActions">
+        <button class="tm-chip-btn" id="btnOpenEditModal">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          <span>Chỉnh sửa thông tin</span>
+        </button>
+        <button class="tm-chip-btn tm-chip-save" id="btnQuickSave">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Lưu ảnh</span>
+        </button>
+      </div>
     </main>
+
+    <!-- 3. BOTTOM TEMPLATES DRAWER ("MẪU") -->
+    <section class="tm-bottom-drawer" id="bottomDrawer">
+      <!-- Drawer Handle & Header -->
+      <div class="tm-drawer-header">
+        <button class="tm-btn-ghost" id="btnNoneTemplate" title="Xóa tem">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></line>
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+          </svg>
+        </button>
+        <h2 class="tm-drawer-title">Mẫu</h2>
+        <div class="tm-drawer-header-right">
+          <button class="tm-btn-ghost" title="Đội nhóm">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          </button>
+          <button class="tm-btn-ghost" id="btnCloseDrawer" title="Thu gọn">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Team Watermark Info Banner -->
+      <div class="tm-team-banner">
+        <div class="tm-team-banner-content">
+          <h4>Dấu mờ đội nhóm <button class="tm-banner-close">✕</button></h4>
+          <p>Đơn giản hóa nhập liệu của nhân viên và giữ ảnh đội nhóm ở định dạng thống nhất</p>
+          <a href="#" class="tm-link-arrow">Tìm hiểu thêm →</a>
+        </div>
+      </div>
+
+      <!-- Templates Cards Grid (Matching TimeMark) -->
+      <div class="tm-templates-scroll">
+        <div class="tm-templates-grid">
+
+          <!-- 1. THỜI GIAN & VỊ TRÍ (Active Default like in screenshot) -->
+          <div class="tm-template-card active" data-template="time_location">
+            <div class="tm-card-inner">
+              <div class="tm-tpl-preview-box">
+                <div class="tm-preview-clock-row">
+                  <span class="tm-pv-time">09:30</span>
+                  <span class="tm-pv-bar">|</span>
+                  <span class="tm-pv-date">30 Thg 1</span>
+                </div>
+                <div class="tm-pv-location">Tao Dan Park, Hồ Chí Minh</div>
+              </div>
+              <div class="tm-card-actions-hover">
+                <button class="tm-btn-share" type="button">Chia sẻ</button>
+                <button class="tm-btn-edit-trigger" type="button">Chỉnh sửa</button>
+              </div>
+            </div>
+            <div class="tm-card-footer">Thời gian & Vị trí</div>
+          </div>
+
+          <!-- 2. ĐIỂM DANH (Attendance) -->
+          <div class="tm-template-card" data-template="attendance">
+            <div class="tm-card-inner">
+              <div class="tm-tpl-preview-box">
+                <div class="tm-preview-attend-row">
+                  <span class="tm-tag-yellow">Điểm danh</span>
+                  <span class="tm-time-box">23:40</span>
+                </div>
+                <div class="tm-pv-attend-details">
+                  <span class="tm-amber-line"></span>
+                  <div class="tm-attend-text">
+                    <div>30/01/2022</div>
+                    <div>Tao Dan Park, Hồ Chí Minh</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="tm-card-footer">Điểm danh</div>
+          </div>
+
+          <!-- 3. TÊN DỊCH VỤ / CÔNG VIỆC -->
+          <div class="tm-template-card" data-template="service">
+            <div class="tm-card-inner">
+              <div class="tm-tpl-preview-box">
+                <div class="tm-pv-service-title">Tên dịch vụ</div>
+                <div class="tm-pv-service-body">
+                  <span class="tm-amber-line"></span>
+                  <div class="tm-service-details">
+                    <div>30/01/2023 09:30</div>
+                    <div>👉 : Chi tiết dịch vụ</div>
+                    <div>☎ : 0123456666</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="tm-card-footer">Dịch vụ</div>
+          </div>
+
+          <!-- 4. ĐÃ HOÀN THÀNH (Task Completed) -->
+          <div class="tm-template-card" data-template="completed">
+            <div class="tm-card-inner">
+              <div class="tm-tpl-preview-box">
+                <div class="tm-completed-badge">09:30 ✓</div>
+                <div class="tm-completed-title">Đã hoàn thành</div>
+                <div class="tm-pv-service-body">
+                  <span class="tm-amber-line"></span>
+                  <div class="tm-service-details">
+                    <div>30/01/2023</div>
+                    <div>Tao Dan Park, Hồ Chí Minh</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="tm-card-footer">Đã hoàn thành</div>
+          </div>
+
+          <!-- 5. BÁO CÁO CÔNG TRÌNH / DỰ ÁN (Detailed Project) -->
+          <div class="tm-template-card" data-template="project_report">
+            <div class="tm-card-inner">
+              <div class="tm-tpl-preview-box">
+                <div class="tm-proj-time">14:35:20</div>
+                <div class="tm-proj-line"></div>
+                <div class="tm-proj-sub">Dự án: West Bay B - Ecopark</div>
+                <div class="tm-proj-sub">GPS: 20.9632° N, 105.9321° E</div>
+              </div>
+            </div>
+            <div class="tm-card-footer">Công trình & Dự án</div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. BOTTOM ACTION TOOLBAR -->
+    <nav class="tm-bottom-bar">
+      <button class="tm-nav-item" id="btnNavGallery">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+          <polyline points="21 15 16 10 5 21"></polyline>
+        </svg>
+        <span>Chọn ảnh</span>
+      </button>
+
+      <button class="tm-nav-item" id="btnNavEdit">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 20h9"></path>
+          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+        </svg>
+        <span>Sửa chữ</span>
+      </button>
+
+      <button class="tm-nav-item tm-nav-save" id="btnNavSave">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span>Lưu ảnh</span>
+      </button>
+    </nav>
+
   </div>
 
-  <!-- Notification Toast Container -->
+  <!-- 5. EDIT MODAL DIALOG (CHỈNH SỬA THÔNG TIN TEM) -->
+  <div class="tm-modal-overlay" id="editModalOverlay">
+    <div class="tm-modal-sheet">
+      <div class="tm-modal-header">
+        <h3>Chỉnh sửa nội dung tem</h3>
+        <button class="tm-btn-close-modal" id="btnCloseEditModal">✕</button>
+      </div>
+
+      <div class="tm-modal-body">
+        <!-- Date & Time -->
+        <div class="tm-form-section">
+          <label class="tm-field-label">Thời gian & Ngày chụp</label>
+          <div class="tm-input-group">
+            <input type="datetime-local" id="editDateTime" step="1" class="tm-input">
+          </div>
+          <div class="tm-quick-actions mt-1">
+            <button type="button" class="tm-btn-pill" id="btnUseExifDate" disabled>📷 Giờ chụp gốc (EXIF)</button>
+            <button type="button" class="tm-btn-pill" id="btnUseNowDate">⚡ Giờ hiện tại</button>
+          </div>
+        </div>
+
+        <!-- Address -->
+        <div class="tm-form-section">
+          <div class="tm-label-row">
+            <label class="tm-field-label">Vị trí / Địa chỉ hiển thị</label>
+            <button type="button" class="tm-link-btn" id="btnGetGpsLoc">📍 Lấy vị trí GPS</button>
+          </div>
+          <textarea id="editAddress" rows="2" class="tm-input" placeholder="Ví dụ: West Bay B - Kđt Ecopark KĐT Ecopark, X.Phụng Công, Hưng Yên"></textarea>
+        </div>
+
+        <!-- Extra / Project fields -->
+        <div class="tm-form-section" id="sectionExtraFields">
+          <label class="tm-field-label">Tên tiêu đề / Dịch vụ / Dự án</label>
+          <input type="text" id="editTitle" class="tm-input" placeholder="West Bay B - KĐT Ecopark">
+
+          <label class="tm-field-label mt-2">Nội dung chi tiết / Hạng mục</label>
+          <input type="text" id="editDetails" class="tm-input" placeholder="Kiểm tra an ninh & tuần tra">
+
+          <label class="tm-field-label mt-2">Số điện thoại / Người phụ trách</label>
+          <input type="text" id="editPhone" class="tm-input" placeholder="0912 345 678">
+        </div>
+
+        <!-- Position & Size -->
+        <div class="tm-form-section">
+          <label class="tm-field-label">Vị trí tem trên ảnh</label>
+          <div class="tm-pos-buttons">
+            <button type="button" class="tm-pos-btn active" data-pos="bottom-left">Dưới Trái</button>
+            <button type="button" class="tm-pos-btn" data-pos="bottom-center">Dưới Giữa</button>
+            <button type="button" class="tm-pos-btn" data-pos="bottom-right">Dưới Phải</button>
+            <button type="button" class="tm-pos-btn" data-pos="top-left">Trên Trái</button>
+            <button type="button" class="tm-pos-btn" data-pos="top-right">Trên Phải</button>
+          </div>
+
+          <div class="tm-slider-row mt-2">
+            <span>Cỡ chữ tem: <b id="valScale">100%</b></span>
+            <input type="range" id="rangeScale" min="60" max="180" value="100" class="tm-range">
+          </div>
+        </div>
+      </div>
+
+      <div class="tm-modal-footer">
+        <button class="tm-btn-save-modal" id="btnSaveModalChanges">Xong</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <!-- Main JavaScript Logic -->
+  <!-- App Logic -->
   <script src="app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch((err) => {
-          console.log('SW registration failed:', err);
-        });
+        navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW error:', err));
       });
     }
   </script>

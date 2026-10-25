@@ -1,6 +1,6 @@
 /**
- * TimeMark Photo Stamper - Core Application Logic
- * Pure client-side Canvas rendering, EXIF metadata parsing & Batch ZIP export
+ * TimeMark Camera & Watermark Mobile App Engine
+ * Recreates the exact TimeMark watermark and mobile user experience
  */
 
 (() => {
@@ -8,170 +8,65 @@
 
   // --- STATE ---
   const state = {
-    images: [], // { id, file, imgElement, exif, date, lat, lng, address, width, height }
-    activeIndex: -1,
-    isComparing: false,
-    logoImage: null,
-    sampleLogoCreated: false,
-    isRendering: false,
+    currentImage: null, // { file, imgElement, width, height, parsedDate, lat, lng, address }
+    template: 'time_location', // time_location | attendance | service | completed | project_report
     
-    // Configurations
-    config: {
-      template: 'construction', // construction | classic | inspection | minimalist | hud_gps
-      
-      // Date & Time
-      showDateTime: true,
-      dateTimeValue: '', // YYYY-MM-DDTHH:mm:ss
-      dateFormat: 'dd/MM/yyyy HH:mm:ss',
-      showDayOfWeek: true,
-      showSeconds: true,
-      
-      // Location & GPS
-      showLocation: true,
-      address: 'Số 123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh',
-      lat: '10.776889',
-      lng: '106.700806',
-      showGpsCoords: true,
-      
-      // Project & Work
-      showProjectInfo: true,
-      projectName: 'Dự án Căn hộ Sunview Tower',
-      workItem: 'Nghiệm thu cốt thép sàn tầng 5',
-      inspector: 'Kỹ sư: Nguyễn Văn A',
-      notes: 'Đạt yêu cầu kỹ thuật TCVN 5574:2018',
-      verifyCode: '#TM-' + Math.floor(100000 + Math.random() * 900000),
-      
-      // Logo & Brand
-      showLogo: true,
-      logoSize: 48,
-      
-      // Style & Position
-      position: 'bottom-left', // top-left, top-center, top-right, bottom-left, bottom-center, bottom-right
-      scale: 100, // percentage 50 - 180
-      margin: 30, // px at base 1920p
-      bgStyle: 'glass-dark', // glass-dark, solid-dark, navy, glass-light, transparent
-      bgOpacity: 75, // 0 - 100
-      accentColor: '#00E5FF',
-      textColor: '#FFFFFF',
-      
-      // Export
-      exportFormat: 'image/jpeg',
-      exportQuality: 0.95
-    }
+    // Watermark Content
+    dateTime: new Date(),
+    address: 'West Bay B - Kđt Ecopark KĐT Ecopark,\nX.Phụng Công, Hưng Yên',
+    title: 'West Bay B - KĐT Ecopark',
+    details: 'Kiểm tra an ninh & tuần tra',
+    phone: '0912 345 678',
+    
+    // Style & Placement
+    position: 'bottom-left',
+    scale: 100, // percentage
+    amberColor: '#E5A93C', // Signature TimeMark Amber Bar
+    textColor: '#FFFFFF'
   };
 
-  // Day names in Vietnamese and English
   const VN_DAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-  const EN_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   // DOM Elements
   const DOM = {
-    // Header & Global Buttons
-    btnResetAll: document.getElementById('btnResetAll'),
-    btnDownloadSingle: document.getElementById('btnDownloadSingle'),
-    btnBatchDownload: document.getElementById('btnBatchDownload'),
-    batchBtnText: document.getElementById('batchBtnText'),
-    btnDownloadSingleBottom: document.getElementById('btnDownloadSingleBottom'),
-    btnBatchDownloadBottom: document.getElementById('btnBatchDownloadBottom'),
+    // Top Bar
+    btnPickGallery: document.getElementById('btnPickGallery'),
+    filePickerInput: document.getElementById('filePickerInput'),
     
-    // Upload & Thumbnails
-    dropzone: document.getElementById('dropzone'),
-    fileInput: document.getElementById('fileInput'),
-    imageCounterBadge: document.getElementById('imageCounterBadge'),
-    thumbnailsContainer: document.getElementById('thumbnailsContainer'),
-    thumbnailsList: document.getElementById('thumbnailsList'),
-    thumbCount: document.getElementById('thumbCount'),
-    btnClearImages: document.getElementById('btnClearImages'),
-    btnEmptyBrowse: document.getElementById('btnEmptyBrowse'),
-    btnDropzoneDemo: document.getElementById('btnDropzoneDemo'),
-    btnEmptyDemo: document.getElementById('btnEmptyDemo'),
+    // Viewport & Canvas
+    canvasHolder: document.getElementById('canvasHolder'),
+    mainCanvas: document.getElementById('mainCanvas'),
+    tapToPickOverlay: document.getElementById('tapToPickOverlay'),
+    btnLoadDemoImage: document.getElementById('btnLoadDemoImage'),
+    floatingActions: document.getElementById('floatingActions'),
+    btnOpenEditModal: document.getElementById('btnOpenEditModal'),
+    btnQuickSave: document.getElementById('btnQuickSave'),
     
-    // Templates
-    templateCards: document.querySelectorAll('.template-card'),
+    // Drawer & Templates
+    bottomDrawer: document.getElementById('bottomDrawer'),
+    btnCloseDrawer: document.getElementById('btnCloseDrawer'),
+    templateCards: document.querySelectorAll('.tm-template-card'),
     
-    // Date & Time
-    chkShowDateTime: document.getElementById('chkShowDateTime'),
-    datetimeFields: document.getElementById('datetimeFields'),
-    inputDateTime: document.getElementById('inputDateTime'),
+    // Bottom Nav
+    btnNavGallery: document.getElementById('btnNavGallery'),
+    btnNavEdit: document.getElementById('btnNavEdit'),
+    btnNavSave: document.getElementById('btnNavSave'),
+    
+    // Edit Modal
+    editModalOverlay: document.getElementById('editModalOverlay'),
+    btnCloseEditModal: document.getElementById('btnCloseEditModal'),
+    btnSaveModalChanges: document.getElementById('btnSaveModalChanges'),
+    editDateTime: document.getElementById('editDateTime'),
     btnUseExifDate: document.getElementById('btnUseExifDate'),
-    btnUseCurrentDate: document.getElementById('btnUseCurrentDate'),
-    selectDateFormat: document.getElementById('selectDateFormat'),
-    chkShowDayOfWeek: document.getElementById('chkShowDayOfWeek'),
-    chkShowSeconds: document.getElementById('chkShowSeconds'),
-    exifDateStatus: document.getElementById('exifDateStatus'),
-    
-    // Location & GPS
-    chkShowLocation: document.getElementById('chkShowLocation'),
-    locationFields: document.getElementById('locationFields'),
-    inputAddress: document.getElementById('inputAddress'),
-    btnReverseGeocode: document.getElementById('btnReverseGeocode'),
-    inputLat: document.getElementById('inputLat'),
-    inputLng: document.getElementById('inputLng'),
-    btnUseExifGps: document.getElementById('btnUseExifGps'),
-    btnBrowserGps: document.getElementById('btnBrowserGps'),
-    chkShowGpsCoords: document.getElementById('chkShowGpsCoords'),
-    
-    // Project & Work
-    chkShowProjectInfo: document.getElementById('chkShowProjectInfo'),
-    projectFields: document.getElementById('projectFields'),
-    inputProjectName: document.getElementById('inputProjectName'),
-    inputWorkItem: document.getElementById('inputWorkItem'),
-    inputInspector: document.getElementById('inputInspector'),
-    inputNotes: document.getElementById('inputNotes'),
-    inputVerifyCode: document.getElementById('inputVerifyCode'),
-    btnGenVerifyCode: document.getElementById('btnGenVerifyCode'),
-    
-    // Logo
-    chkShowLogo: document.getElementById('chkShowLogo'),
-    logoFields: document.getElementById('logoFields'),
-    logoInput: document.getElementById('logoInput'),
-    btnUploadLogo: document.getElementById('btnUploadLogo'),
-    btnUseSampleLogo: document.getElementById('btnUseSampleLogo'),
-    btnRemoveLogo: document.getElementById('btnRemoveLogo'),
-    logoPreviewImg: document.getElementById('logoPreviewImg'),
-    logoPlaceholder: document.getElementById('logoPlaceholder'),
-    rangeLogoSize: document.getElementById('rangeLogoSize'),
-    valLogoSize: document.getElementById('valLogoSize'),
-    
-    // Style & Position
-    posButtons: document.querySelectorAll('.pos-btn'),
+    btnUseNowDate: document.getElementById('btnUseNowDate'),
+    editAddress: document.getElementById('editAddress'),
+    btnGetGpsLoc: document.getElementById('btnGetGpsLoc'),
+    editTitle: document.getElementById('editTitle'),
+    editDetails: document.getElementById('editDetails'),
+    editPhone: document.getElementById('editPhone'),
+    posButtons: document.querySelectorAll('.tm-pos-btn'),
     rangeScale: document.getElementById('rangeScale'),
     valScale: document.getElementById('valScale'),
-    rangeMargin: document.getElementById('rangeMargin'),
-    valMargin: document.getElementById('valMargin'),
-    selectBgStyle: document.getElementById('selectBgStyle'),
-    rangeBgOpacity: document.getElementById('rangeBgOpacity'),
-    valBgOpacity: document.getElementById('valBgOpacity'),
-    inputAccentColor: document.getElementById('inputAccentColor'),
-    valAccentHex: document.getElementById('valAccentHex'),
-    inputTextColor: document.getElementById('inputTextColor'),
-    valTextHex: document.getElementById('valTextHex'),
-    presetDots: document.querySelectorAll('.preset-dot'),
-    
-    // Export
-    selectExportFormat: document.getElementById('selectExportFormat'),
-    rangeQuality: document.getElementById('rangeQuality'),
-    valQuality: document.getElementById('valQuality'),
-    grpQuality: document.getElementById('grpQuality'),
-    
-    // Preview & Canvas
-    previewCanvas: document.getElementById('previewCanvas'),
-    emptyStatePlaceholder: document.getElementById('emptyStatePlaceholder'),
-    renderLoadingOverlay: document.getElementById('renderLoadingOverlay'),
-    loadingMessage: document.getElementById('loadingMessage'),
-    txtImageResolution: document.getElementById('txtImageResolution'),
-    txtImageSize: document.getElementById('txtImageSize'),
-    txtExifBadge: document.getElementById('txtExifBadge'),
-    btnToggleCompare: document.getElementById('btnToggleCompare'),
-    lblCompare: document.getElementById('lblCompare'),
-    btnZoomFit: document.getElementById('btnZoomFit'),
-    btnZoom100: document.getElementById('btnZoom100'),
-    
-    // Batch Progress
-    batchProgressBarWrapper: document.getElementById('batchProgressBarWrapper'),
-    batchProgressText: document.getElementById('batchProgressText'),
-    batchProgressPercent: document.getElementById('batchProgressPercent'),
-    batchProgressBarFill: document.getElementById('batchProgressBarFill'),
     
     // Toast
     toastContainer: document.getElementById('toastContainer')
@@ -180,790 +75,312 @@
   // --- INITIALIZATION ---
   function init() {
     // Set initial date/time to now
-    setCurrentDateTime();
-    
-    // Initialize UI form fields from default config
-    syncFormFromConfig();
-    
-    // Generate default sample logo so user has something cool immediately
-    createDefaultSampleLogo();
-    
+    syncDateTimeInput();
+    DOM.editAddress.value = state.address;
+    DOM.editTitle.value = state.title;
+    DOM.editDetails.value = state.details;
+    DOM.editPhone.value = state.phone;
+
     // Setup event listeners
     bindEvents();
-    
-    // Create demo image if user wants to test right away without uploading
-    console.log("TimeMark Stamper initialized.");
+
+    // Auto load a sample image so user sees the exact TimeMark look immediately
+    loadSamplePhoto();
   }
 
   // --- EVENT BINDING ---
   function bindEvents() {
-    // Upload triggers
-    DOM.dropzone.addEventListener('click', () => DOM.fileInput.click());
-    DOM.btnEmptyBrowse.addEventListener('click', () => DOM.fileInput.click());
-    DOM.fileInput.addEventListener('change', (e) => handleFilesSelected(e.target.files));
-    
-    if (DOM.btnDropzoneDemo) {
-      DOM.btnDropzoneDemo.addEventListener('click', (e) => {
-        e.stopPropagation();
-        loadDemoImage();
-      });
-    }
-    if (DOM.btnEmptyDemo) {
-      DOM.btnEmptyDemo.addEventListener('click', (e) => {
-        e.stopPropagation();
-        loadDemoImage();
-      });
-    }
-    
-    // Drag & Drop
-    DOM.dropzone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      DOM.dropzone.classList.add('dragover');
-    });
-    DOM.dropzone.addEventListener('dragleave', () => DOM.dropzone.classList.remove('dragover'));
-    DOM.dropzone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      DOM.dropzone.classList.remove('dragover');
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        handleFilesSelected(e.dataTransfer.files);
+    // Pick photo triggers
+    DOM.btnPickGallery.addEventListener('click', () => DOM.filePickerInput.click());
+    DOM.btnNavGallery.addEventListener('click', () => DOM.filePickerInput.click());
+    DOM.tapToPickOverlay.addEventListener('click', (e) => {
+      if (e.target !== DOM.btnLoadDemoImage) {
+        DOM.filePickerInput.click();
       }
     });
+    DOM.filePickerInput.addEventListener('change', handleFileSelected);
 
-    // Clear all images
-    DOM.btnClearImages.addEventListener('click', clearAllImages);
+    // Demo image
+    DOM.btnLoadDemoImage.addEventListener('click', (e) => {
+      e.stopPropagation();
+      loadSamplePhoto();
+    });
 
     // Template selection
     DOM.templateCards.forEach(card => {
       card.addEventListener('click', () => {
         DOM.templateCards.forEach(c => c.classList.remove('active'));
         card.classList.add('active');
-        state.config.template = card.dataset.template;
-        renderActiveImage();
+        state.template = card.dataset.template;
+        renderCanvas();
       });
+
+      // Quick edit button inside card
+      const editBtn = card.querySelector('.tm-btn-edit-trigger');
+      if (editBtn) {
+        editBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openEditModal();
+        });
+      }
     });
 
-    // Position buttons
+    // Edit Modal open/close
+    DOM.btnOpenEditModal.addEventListener('click', openEditModal);
+    DOM.btnNavEdit.addEventListener('click', openEditModal);
+    DOM.btnCloseEditModal.addEventListener('click', closeEditModal);
+    DOM.btnSaveModalChanges.addEventListener('click', applyModalChanges);
+    DOM.editModalOverlay.addEventListener('click', (e) => {
+      if (e.target === DOM.editModalOverlay) closeEditModal();
+    });
+
+    // Date actions in modal
+    DOM.btnUseNowDate.addEventListener('click', () => {
+      state.dateTime = new Date();
+      syncDateTimeInput();
+    });
+    DOM.btnUseExifDate.addEventListener('click', applyExifDate);
+
+    // GPS in modal
+    DOM.btnGetGpsLoc.addEventListener('click', requestDeviceGps);
+
+    // Position buttons in modal
     DOM.posButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         DOM.posButtons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        state.config.position = btn.dataset.pos;
-        renderActiveImage();
+        state.position = btn.dataset.pos;
       });
     });
 
-    // Section Toggles
-    setupToggle(DOM.chkShowDateTime, DOM.datetimeFields, (checked) => {
-      state.config.showDateTime = checked;
-      renderActiveImage();
-    });
-    setupToggle(DOM.chkShowLocation, DOM.locationFields, (checked) => {
-      state.config.showLocation = checked;
-      renderActiveImage();
-    });
-    setupToggle(DOM.chkShowProjectInfo, DOM.projectFields, (checked) => {
-      state.config.showProjectInfo = checked;
-      renderActiveImage();
-    });
-    setupToggle(DOM.chkShowLogo, DOM.logoFields, (checked) => {
-      state.config.showLogo = checked;
-      renderActiveImage();
-    });
-
-    // Date/Time controls
-    DOM.inputDateTime.addEventListener('input', (e) => {
-      state.config.dateTimeValue = e.target.value;
-      renderActiveImage();
-    });
-    DOM.btnUseCurrentDate.addEventListener('click', () => {
-      setCurrentDateTime();
-      renderActiveImage();
-    });
-    DOM.btnUseExifDate.addEventListener('click', applyActiveImageExifDate);
-    DOM.selectDateFormat.addEventListener('change', (e) => {
-      state.config.dateFormat = e.target.value;
-      renderActiveImage();
-    });
-    DOM.chkShowDayOfWeek.addEventListener('change', (e) => {
-      state.config.showDayOfWeek = e.target.checked;
-      renderActiveImage();
-    });
-    DOM.chkShowSeconds.addEventListener('change', (e) => {
-      state.config.showSeconds = e.target.checked;
-      renderActiveImage();
-    });
-
-    // Location controls
-    DOM.inputAddress.addEventListener('input', (e) => {
-      state.config.address = e.target.value;
-      renderActiveImage();
-    });
-    DOM.inputLat.addEventListener('input', (e) => {
-      state.config.lat = e.target.value;
-      renderActiveImage();
-    });
-    DOM.inputLng.addEventListener('input', (e) => {
-      state.config.lng = e.target.value;
-      renderActiveImage();
-    });
-    DOM.chkShowGpsCoords.addEventListener('change', (e) => {
-      state.config.showGpsCoords = e.target.checked;
-      renderActiveImage();
-    });
-    DOM.btnUseExifGps.addEventListener('click', applyActiveImageExifGps);
-    DOM.btnBrowserGps.addEventListener('click', requestBrowserGps);
-    DOM.btnReverseGeocode.addEventListener('click', fetchAddressFromGps);
-
-    // Project controls
-    DOM.inputProjectName.addEventListener('input', (e) => {
-      state.config.projectName = e.target.value;
-      renderActiveImage();
-    });
-    DOM.inputWorkItem.addEventListener('input', (e) => {
-      state.config.workItem = e.target.value;
-      renderActiveImage();
-    });
-    DOM.inputInspector.addEventListener('input', (e) => {
-      state.config.inspector = e.target.value;
-      renderActiveImage();
-    });
-    DOM.inputNotes.addEventListener('input', (e) => {
-      state.config.notes = e.target.value;
-      renderActiveImage();
-    });
-    DOM.inputVerifyCode.addEventListener('input', (e) => {
-      state.config.verifyCode = e.target.value;
-      renderActiveImage();
-    });
-    DOM.btnGenVerifyCode.addEventListener('click', () => {
-      state.config.verifyCode = '#TM-' + Math.floor(100000 + Math.random() * 900000);
-      DOM.inputVerifyCode.value = state.config.verifyCode;
-      renderActiveImage();
-    });
-
-    // Logo controls
-    DOM.btnUploadLogo.addEventListener('click', () => DOM.logoInput.click());
-    DOM.logoInput.addEventListener('change', handleLogoSelected);
-    DOM.btnUseSampleLogo.addEventListener('click', createDefaultSampleLogo);
-    DOM.btnRemoveLogo.addEventListener('click', removeLogo);
-    DOM.rangeLogoSize.addEventListener('input', (e) => {
-      state.config.logoSize = parseInt(e.target.value, 10);
-      DOM.valLogoSize.textContent = `${state.config.logoSize}px`;
-      renderActiveImage();
-    });
-
-    // Sliders & Colors
+    // Scale slider in modal
     DOM.rangeScale.addEventListener('input', (e) => {
-      state.config.scale = parseInt(e.target.value, 10);
-      DOM.valScale.textContent = `${state.config.scale}%`;
-      renderActiveImage();
-    });
-    DOM.rangeMargin.addEventListener('input', (e) => {
-      state.config.margin = parseInt(e.target.value, 10);
-      DOM.valMargin.textContent = `${state.config.margin}px`;
-      renderActiveImage();
-    });
-    DOM.selectBgStyle.addEventListener('change', (e) => {
-      state.config.bgStyle = e.target.value;
-      renderActiveImage();
-    });
-    DOM.rangeBgOpacity.addEventListener('input', (e) => {
-      state.config.bgOpacity = parseInt(e.target.value, 10);
-      DOM.valBgOpacity.textContent = `${state.config.bgOpacity}%`;
-      renderActiveImage();
-    });
-    DOM.inputAccentColor.addEventListener('input', (e) => {
-      state.config.accentColor = e.target.value;
-      DOM.valAccentHex.textContent = e.target.value.toUpperCase();
-      renderActiveImage();
-    });
-    DOM.inputTextColor.addEventListener('input', (e) => {
-      state.config.textColor = e.target.value;
-      DOM.valTextHex.textContent = e.target.value.toUpperCase();
-      renderActiveImage();
+      state.scale = parseInt(e.target.value, 10);
+      DOM.valScale.textContent = `${state.scale}%`;
+      renderCanvas();
     });
 
-    // Preset color dots
-    DOM.presetDots.forEach(dot => {
-      dot.addEventListener('click', () => {
-        const color = dot.dataset.color;
-        state.config.accentColor = color;
-        DOM.inputAccentColor.value = color;
-        DOM.valAccentHex.textContent = color;
-        renderActiveImage();
-      });
-    });
+    // Save image triggers
+    DOM.btnQuickSave.addEventListener('click', downloadStampedPhoto);
+    DOM.btnNavSave.addEventListener('click', downloadStampedPhoto);
 
-    // Export formats & Quality
-    DOM.selectExportFormat.addEventListener('change', (e) => {
-      state.config.exportFormat = e.target.value;
-      DOM.grpQuality.style.display = (e.target.value === 'image/jpeg') ? 'flex' : 'none';
-    });
-    DOM.rangeQuality.addEventListener('input', (e) => {
-      state.config.exportQuality = parseInt(e.target.value, 10) / 100;
-      DOM.valQuality.textContent = `${e.target.value}%`;
-    });
-
-    // Reset button
-    DOM.btnResetAll.addEventListener('click', resetAllSettings);
-
-    // Download Single buttons
-    DOM.btnDownloadSingle.addEventListener('click', downloadCurrentSingle);
-    DOM.btnDownloadSingleBottom.addEventListener('click', downloadCurrentSingle);
-
-    // Batch Download buttons
-    DOM.btnBatchDownload.addEventListener('click', downloadAllBatchZip);
-    DOM.btnBatchDownloadBottom.addEventListener('click', downloadAllBatchZip);
-
-    // Compare original button (press & hold or click toggle)
-    DOM.btnToggleCompare.addEventListener('mousedown', () => toggleCompare(true));
-    DOM.btnToggleCompare.addEventListener('mouseup', () => toggleCompare(false));
-    DOM.btnToggleCompare.addEventListener('mouseleave', () => toggleCompare(false));
-    DOM.btnToggleCompare.addEventListener('touchstart', (e) => { e.preventDefault(); toggleCompare(true); });
-    DOM.btnToggleCompare.addEventListener('touchend', (e) => { e.preventDefault(); toggleCompare(false); });
-
-    // Zoom buttons
-    DOM.btnZoomFit.addEventListener('click', () => {
-      DOM.previewCanvas.style.maxWidth = '100%';
-      DOM.previewCanvas.style.maxHeight = '100%';
-    });
-    DOM.btnZoom100.addEventListener('click', () => {
-      DOM.previewCanvas.style.maxWidth = 'none';
-      DOM.previewCanvas.style.maxHeight = 'none';
+    // Drawer toggle
+    DOM.btnCloseDrawer.addEventListener('click', () => {
+      DOM.bottomDrawer.classList.toggle('collapsed');
     });
   }
 
-  function setupToggle(checkbox, bodyElement, callback) {
-    checkbox.addEventListener('change', () => {
-      bodyElement.style.opacity = checkbox.checked ? '1' : '0.4';
-      bodyElement.style.pointerEvents = checkbox.checked ? 'auto' : 'none';
-      callback(checkbox.checked);
-    });
+  function syncDateTimeInput() {
+    const d = state.dateTime;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    DOM.editDateTime.value = `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`;
   }
 
-  function syncFormFromConfig() {
-    DOM.inputDateTime.value = state.config.dateTimeValue;
-    DOM.inputAddress.value = state.config.address;
-    DOM.inputLat.value = state.config.lat;
-    DOM.inputLng.value = state.config.lng;
-    DOM.inputProjectName.value = state.config.projectName;
-    DOM.inputWorkItem.value = state.config.workItem;
-    DOM.inputInspector.value = state.config.inspector;
-    DOM.inputNotes.value = state.config.notes;
-    DOM.inputVerifyCode.value = state.config.verifyCode;
-    DOM.rangeLogoSize.value = state.config.logoSize;
-    DOM.valLogoSize.textContent = `${state.config.logoSize}px`;
-    DOM.rangeScale.value = state.config.scale;
-    DOM.valScale.textContent = `${state.config.scale}%`;
-    DOM.rangeMargin.value = state.config.margin;
-    DOM.valMargin.textContent = `${state.config.margin}px`;
-    DOM.selectBgStyle.value = state.config.bgStyle;
-    DOM.rangeBgOpacity.value = state.config.bgOpacity;
-    DOM.valBgOpacity.textContent = `${state.config.bgOpacity}%`;
-    DOM.inputAccentColor.value = state.config.accentColor;
-    DOM.valAccentHex.textContent = state.config.accentColor;
-    DOM.inputTextColor.value = state.config.textColor;
-    DOM.valTextHex.textContent = state.config.textColor;
-  }
-
-  function setCurrentDateTime() {
-    const now = new Date();
-    // format as YYYY-MM-DDTHH:mm:ss for input[type="datetime-local"]
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-    state.config.dateTimeValue = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-    DOM.inputDateTime.value = state.config.dateTimeValue;
-  }
-
-  // --- FILE HANDLING & EXIF ---
-  async function handleFilesSelected(files) {
+  // --- FILE & EXIF HANDLING ---
+  async function handleFileSelected(e) {
+    const files = e.target.files;
     if (!files || files.length === 0) return;
-    
-    showLoading(true, "Đang đọc thông tin ảnh và dữ liệu EXIF...");
+    const file = files[0];
 
-    const fileList = Array.from(files);
-    let loadedCount = 0;
+    showToast("Đang đọc thông tin ảnh...", "info");
 
-    for (const file of fileList) {
-      if (!file.type.startsWith('image/')) continue;
+    let parsedDate = null;
+    let lat = null;
+    let lng = null;
 
+    // Read EXIF with exifr
+    if (window.exifr) {
       try {
-        const item = await processImageFile(file);
-        state.images.push(item);
-        loadedCount++;
-      } catch (err) {
-        console.error("Error reading file:", file.name, err);
-        showToast(`Không thể đọc ảnh ${file.name}: ${err.message}`, 'error');
-      }
-    }
-
-    showLoading(false);
-
-    if (loadedCount > 0) {
-      if (state.activeIndex === -1 || state.activeIndex >= state.images.length) {
-        state.activeIndex = state.images.length - loadedCount;
-      }
-      updateThumbnailsUI();
-      selectImage(state.activeIndex);
-      showToast(`Đã thêm thành công ${loadedCount} ảnh!`, 'success');
-    }
-  }
-
-  async function processImageFile(file) {
-    return new Promise(async (resolve, reject) => {
-      // 1. Read EXIF metadata using exifr
-      let exif = null;
-      let parsedDate = null;
-      let parsedLat = null;
-      let parsedLng = null;
-      let camera = null;
-
-      if (window.exifr) {
-        try {
-          exif = await window.exifr.parse(file, [
-            'DateTimeOriginal', 'CreateDate', 'ModifyDate',
-            'latitude', 'longitude', 'Make', 'Model'
-          ]);
-
-          if (exif) {
-            // Parse Date
-            const rawDate = exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate;
-            if (rawDate instanceof Date && !isNaN(rawDate)) {
-              parsedDate = rawDate;
-            }
-
-            // Parse GPS
-            if (typeof exif.latitude === 'number' && typeof exif.longitude === 'number') {
-              parsedLat = exif.latitude.toFixed(6);
-              parsedLng = exif.longitude.toFixed(6);
-            }
-
-            // Camera info
-            if (exif.Make || exif.Model) {
-              camera = `${exif.Make || ''} ${exif.Model || ''}`.trim();
-            }
+        const exif = await window.exifr.parse(file, [
+          'DateTimeOriginal', 'CreateDate', 'latitude', 'longitude'
+        ]);
+        if (exif) {
+          const rawDate = exif.DateTimeOriginal || exif.CreateDate;
+          if (rawDate instanceof Date && !isNaN(rawDate)) {
+            parsedDate = rawDate;
           }
-        } catch (exifErr) {
-          console.warn("EXIF read error or no EXIF in file:", exifErr);
+          if (typeof exif.latitude === 'number' && typeof exif.longitude === 'number') {
+            lat = exif.latitude;
+            lng = exif.longitude;
+          }
         }
+      } catch (err) {
+        console.warn("EXIF error:", err);
       }
-
-      // 2. Fallback date from file if no EXIF date
-      if (!parsedDate && file.lastModified) {
-        parsedDate = new Date(file.lastModified);
-      }
-
-      // 3. Load image object for rendering
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          resolve({
-            id: 'img_' + Math.random().toString(36).substr(2, 9),
-            file: file,
-            imgElement: img,
-            thumbnailSrc: e.target.result,
-            width: img.naturalWidth || img.width,
-            height: img.naturalHeight || img.height,
-            exif: exif,
-            parsedDate: parsedDate,
-            lat: parsedLat,
-            lng: parsedLng,
-            camera: camera,
-            address: null // will be filled if reverse geocoded
-          });
-        };
-        img.onerror = () => reject(new Error("Lỗi nạp hình ảnh"));
-        img.src = e.target.result;
-      };
-      reader.onerror = () => reject(new Error("Lỗi đọc tập tin"));
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function updateThumbnailsUI() {
-    const count = state.images.length;
-    DOM.thumbCount.textContent = count;
-    DOM.imageCounterBadge.textContent = `${count} ảnh`;
-    DOM.imageCounterBadge.style.display = count > 0 ? 'inline-block' : 'none';
-    DOM.thumbnailsContainer.style.display = count > 1 ? 'block' : 'none';
-
-    // Show/Hide batch download buttons
-    if (count > 1) {
-      DOM.btnBatchDownload.style.display = 'inline-flex';
-      DOM.btnBatchDownloadBottom.style.display = 'inline-flex';
-      DOM.batchBtnText.textContent = `Tải tất cả (${count} ảnh ZIP)`;
-    } else {
-      DOM.btnBatchDownload.style.display = 'none';
-      DOM.btnBatchDownloadBottom.style.display = 'none';
     }
 
-    // Render thumbnail items
-    DOM.thumbnailsList.innerHTML = '';
-    state.images.forEach((imgObj, idx) => {
-      const thumb = document.createElement('div');
-      thumb.className = `thumb-item ${idx === state.activeIndex ? 'active' : ''}`;
-      thumb.title = imgObj.file.name;
-      
-      const img = document.createElement('img');
-      img.src = imgObj.thumbnailSrc;
-      thumb.appendChild(img);
-
-      const delBtn = document.createElement('button');
-      delBtn.className = 'thumb-remove-btn';
-      delBtn.innerHTML = '×';
-      delBtn.title = 'Xóa ảnh này';
-      delBtn.onclick = (e) => {
-        e.stopPropagation();
-        removeImageAtIndex(idx);
-      };
-      thumb.appendChild(delBtn);
-
-      thumb.onclick = () => selectImage(idx);
-      DOM.thumbnailsList.appendChild(thumb);
-    });
-  }
-
-  function selectImage(index) {
-    if (index < 0 || index >= state.images.length) return;
-    state.activeIndex = index;
-
-    const current = state.images[index];
-
-    // Update thumbnail active states
-    const items = DOM.thumbnailsList.querySelectorAll('.thumb-item');
-    items.forEach((item, i) => {
-      item.classList.toggle('active', i === index);
-    });
-
-    // Update image info tag
-    DOM.txtImageResolution.textContent = `${current.width} × ${current.height} px`;
-    DOM.txtImageSize.textContent = formatBytes(current.file.size);
-
-    // Update EXIF badges and controls
-    if (current.exif && (current.parsedDate || current.lat)) {
-      DOM.txtExifBadge.style.display = 'inline-block';
-      DOM.txtExifBadge.textContent = 'EXIF ĐÃ ĐỌC';
-    } else {
-      DOM.txtExifBadge.style.display = 'none';
+    if (!parsedDate && file.lastModified) {
+      parsedDate = new Date(file.lastModified);
     }
-
-    // Auto-apply EXIF date if available and not manually overridden
-    if (current.parsedDate) {
-      DOM.btnUseExifDate.disabled = false;
-      const d = current.parsedDate;
-      const dateStr = formatToDatetimeLocal(d);
-      state.config.dateTimeValue = dateStr;
-      DOM.inputDateTime.value = dateStr;
-      DOM.exifDateStatus.textContent = `Đã tìm thấy ngày chụp gốc: ${formatDate(d, 'dd/MM/yyyy HH:mm:ss')}`;
-    } else {
-      DOM.btnUseExifDate.disabled = true;
-      DOM.exifDateStatus.textContent = `Không có ngày chụp gốc trong EXIF. Dùng thời gian hiện tại hoặc file date.`;
-    }
-
-    // Auto-apply EXIF GPS if available
-    if (current.lat && current.lng) {
-      DOM.btnUseExifGps.disabled = false;
-      state.config.lat = current.lat;
-      state.config.lng = current.lng;
-      DOM.inputLat.value = current.lat;
-      DOM.inputLng.value = current.lng;
-      // Auto reverse geocode first time
-      if (!current.address) {
-        fetchAddressFromGps();
-      }
-    } else {
-      DOM.btnUseExifGps.disabled = true;
-    }
-
-    // Enable download buttons
-    DOM.btnDownloadSingle.disabled = false;
-    DOM.btnDownloadSingleBottom.disabled = false;
-
-    // Show canvas, hide empty state
-    DOM.emptyStatePlaceholder.style.display = 'none';
-    DOM.previewCanvas.style.display = 'block';
-
-    // Render image
-    renderActiveImage();
-  }
-
-  function removeImageAtIndex(idx) {
-    state.images.splice(idx, 1);
-    if (state.images.length === 0) {
-      clearAllImages();
-    } else {
-      if (state.activeIndex >= state.images.length) {
-        state.activeIndex = state.images.length - 1;
-      }
-      updateThumbnailsUI();
-      selectImage(state.activeIndex);
-    }
-  }
-
-  function clearAllImages() {
-    state.images = [];
-    state.activeIndex = -1;
-    DOM.fileInput.value = '';
-    DOM.emptyStatePlaceholder.style.display = 'flex';
-    DOM.previewCanvas.style.display = 'none';
-    DOM.btnDownloadSingle.disabled = true;
-    DOM.btnDownloadSingleBottom.disabled = true;
-    DOM.btnBatchDownload.style.display = 'none';
-    DOM.btnBatchDownloadBottom.style.display = 'none';
-    DOM.imageCounterBadge.style.display = 'none';
-    DOM.thumbnailsContainer.style.display = 'none';
-    DOM.txtImageResolution.textContent = 'Chưa có ảnh';
-    DOM.txtImageSize.textContent = '0 MB';
-    DOM.txtExifBadge.style.display = 'none';
-    showToast("Đã xóa danh sách ảnh.", 'info');
-  }
-
-  function applyActiveImageExifDate() {
-    if (state.activeIndex < 0) return;
-    const cur = state.images[state.activeIndex];
-    if (cur && cur.parsedDate) {
-      state.config.dateTimeValue = formatToDatetimeLocal(cur.parsedDate);
-      DOM.inputDateTime.value = state.config.dateTimeValue;
-      renderActiveImage();
-      showToast("Đã áp dụng ngày giờ chụp gốc từ EXIF!", "success");
-    }
-  }
-
-  function applyActiveImageExifGps() {
-    if (state.activeIndex < 0) return;
-    const cur = state.images[state.activeIndex];
-    if (cur && cur.lat && cur.lng) {
-      state.config.lat = cur.lat;
-      state.config.lng = cur.lng;
-      DOM.inputLat.value = cur.lat;
-      DOM.inputLng.value = cur.lng;
-      renderActiveImage();
-      showToast("Đã lấy tọa độ GPS từ ảnh!", "success");
-    }
-  }
-
-  function requestBrowserGps() {
-    if (!navigator.geolocation) {
-      showToast("Trình duyệt không hỗ trợ Geolocation.", "error");
-      return;
-    }
-    showToast("Đang xác định vị trí hiện tại của bạn...", "info");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        state.config.lat = pos.coords.latitude.toFixed(6);
-        state.config.lng = pos.coords.longitude.toFixed(6);
-        DOM.inputLat.value = state.config.lat;
-        DOM.inputLng.value = state.config.lng;
-        renderActiveImage();
-        showToast("Đã cập nhật tọa độ thiết bị thành công!", "success");
-        fetchAddressFromGps();
-      },
-      (err) => {
-        showToast("Không thể lấy vị trí: " + err.message, "error");
-      },
-      { timeout: 10000, enableHighAccuracy: true }
-    );
-  }
-
-  async function fetchAddressFromGps() {
-    const lat = state.config.lat;
-    const lng = state.config.lng;
-    if (!lat || !lng) {
-      showToast("Vui lòng nhập hoặc lấy tọa độ GPS trước.", "error");
-      return;
-    }
-
-    showToast("Đang tìm địa chỉ từ OpenStreetMap...", "info");
-    try {
-      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`;
-      const res = await fetch(url, { headers: { 'Accept-Language': 'vi' } });
-      if (!res.ok) throw new Error("Mạng hoặc máy chủ không phản hồi");
-      const data = await res.json();
-      if (data && data.display_name) {
-        state.config.address = data.display_name;
-        DOM.inputAddress.value = data.display_name;
-        if (state.activeIndex >= 0) {
-          state.images[state.activeIndex].address = data.display_name;
-        }
-        renderActiveImage();
-        showToast("Đã tìm thấy địa chỉ!", "success");
-      } else {
-        throw new Error("Không có dữ liệu địa chỉ");
-      }
-    } catch (err) {
-      console.warn("Reverse geocode failed:", err);
-      showToast("Không thể tự động lấy địa chỉ (bạn có thể nhập tay).", "info");
-    }
-  }
-
-  // --- DEMO IMAGE GENERATOR ---
-  function loadDemoImage() {
-    showLoading(true, "Đang tạo ảnh công trình mẫu độ phân giải cao...");
-
-    const w = 1920;
-    const h = 1280;
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-
-    // Sky gradient
-    const skyGrad = ctx.createLinearGradient(0, 0, 0, h * 0.7);
-    skyGrad.addColorStop(0, '#0f172a');
-    skyGrad.addColorStop(0.4, '#1e293b');
-    skyGrad.addColorStop(0.8, '#334155');
-    skyGrad.addColorStop(1, '#475569');
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, w, h);
-
-    // Ground & building concrete structure
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(0, h * 0.65, w, h * 0.35);
-
-    // Building pillars and scaffolding silhouettes
-    ctx.fillStyle = '#0f172a';
-    for (let x = 80; x < w; x += 180) {
-      ctx.fillRect(x, h * 0.3, 24, h * 0.4);
-    }
-    for (let y = h * 0.35; y < h * 0.7; y += 90) {
-      ctx.fillRect(60, y, w - 120, 14);
-    }
-
-    // Construction crane silhouette
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 8;
-    ctx.beginPath();
-    ctx.moveTo(w * 0.75, h * 0.7);
-    ctx.lineTo(w * 0.75, h * 0.15);
-    ctx.lineTo(w * 0.95, h * 0.15);
-    ctx.moveTo(w * 0.65, h * 0.15);
-    ctx.lineTo(w * 0.95, h * 0.15);
-    ctx.stroke();
-
-    // Crane cables
-    ctx.strokeStyle = '#94a3b8';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(w * 0.75, h * 0.1);
-    ctx.lineTo(w * 0.9, h * 0.15);
-    ctx.lineTo(w * 0.75, h * 0.15);
-    ctx.stroke();
-
-    // Text on demo photo: "HIỆN TRƯỜNG THI CÔNG - DEMO"
-    ctx.font = '700 36px "Plus Jakarta Sans", sans-serif';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.fillText('ẢNH HIỆN TRƯỜNG THI CÔNG (DEMO)', 80, 120);
-
-    canvas.toBlob((blob) => {
-      showLoading(false);
-      const demoFile = new File([blob], "Hien_Truong_Thi_Cong_Demo.jpg", {
-        type: "image/jpeg",
-        lastModified: Date.now() - 3600000 // 1 hour ago
-      });
-      handleFilesSelected([demoFile]);
-    }, 'image/jpeg', 0.92);
-  }
-
-  // --- LOGO HANDLING ---
-  function handleLogoSelected(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
-        state.logoImage = img;
-        DOM.logoPreviewImg.src = event.target.result;
-        DOM.logoPreviewImg.style.display = 'block';
-        DOM.logoPlaceholder.style.display = 'none';
-        DOM.btnRemoveLogo.style.display = 'inline-block';
-        renderActiveImage();
-        showToast("Đã tải lên logo thành công!", "success");
+        state.currentImage = {
+          file: file,
+          imgElement: img,
+          width: img.naturalWidth || img.width,
+          height: img.naturalHeight || img.height,
+          parsedDate: parsedDate,
+          lat: lat,
+          lng: lng
+        };
+
+        if (parsedDate) {
+          state.dateTime = parsedDate;
+          syncDateTimeInput();
+          DOM.btnUseExifDate.disabled = false;
+        } else {
+          DOM.btnUseExifDate.disabled = true;
+        }
+
+        // Hide tap placeholder, show floating actions
+        DOM.tapToPickOverlay.style.display = 'none';
+        DOM.floatingActions.style.display = 'flex';
+
+        renderCanvas();
+        showToast("Đã tải ảnh & cập nhật ngày giờ thành công!", "success");
+
+        // If GPS found, reverse geocode
+        if (lat && lng) {
+          fetchAddressFromCoords(lat, lng);
+        }
       };
       img.src = event.target.result;
     };
     reader.readAsDataURL(file);
   }
 
-  function createDefaultSampleLogo() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 120;
-    canvas.height = 120;
-    const ctx = canvas.getContext('2d');
+  function applyExifDate() {
+    if (state.currentImage && state.currentImage.parsedDate) {
+      state.dateTime = state.currentImage.parsedDate;
+      syncDateTimeInput();
+      renderCanvas();
+      showToast("Đã dùng ngày giờ chụp gốc từ ảnh!", "success");
+    }
+  }
 
-    // Draw stylish shield badge with checkmark and helmet
-    ctx.clearRect(0, 0, 120, 120);
+  function requestDeviceGps() {
+    if (!navigator.geolocation) {
+      showToast("Trình duyệt không hỗ trợ định vị.", "error");
+      return;
+    }
+    showToast("Đang lấy vị trí GPS...", "info");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        fetchAddressFromCoords(lat, lng);
+      },
+      (err) => {
+        showToast("Không thể lấy GPS: " + err.message, "error");
+      },
+      { timeout: 8000, enableHighAccuracy: true }
+    );
+  }
 
-    // Shield background
-    ctx.beginPath();
-    ctx.moveTo(60, 10);
-    ctx.lineTo(105, 25);
-    ctx.lineTo(95, 80);
-    ctx.lineTo(60, 110);
-    ctx.lineTo(25, 80);
-    ctx.lineTo(15, 25);
-    ctx.closePath();
-    ctx.fillStyle = '#0284c7';
-    ctx.fill();
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = '#00e5ff';
-    ctx.stroke();
+  async function fetchAddressFromCoords(lat, lng) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`;
+      const res = await fetch(url, { headers: { 'Accept-Language': 'vi' } });
+      const data = await res.json();
+      if (data && data.display_name) {
+        state.address = data.display_name;
+        DOM.editAddress.value = state.address;
+        renderCanvas();
+        showToast("Đã cập nhật địa chỉ từ GPS!", "success");
+      }
+    } catch (e) {
+      console.warn("Geocode error:", e);
+    }
+  }
 
-    // Checkmark
-    ctx.beginPath();
-    ctx.moveTo(38, 58);
-    ctx.lineTo(54, 75);
-    ctx.lineTo(82, 42);
-    ctx.lineWidth = 8;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.stroke();
+  // --- SAMPLE PHOTO CREATOR ---
+  function loadSamplePhoto() {
+    const w = 1080;
+    const h = 1920; // 9:16 vertical phone aspect ratio
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = w;
+    tempCanvas.height = h;
+    const ctx = tempCanvas.getContext('2d');
+
+    // Realistic night/evening background like in the user's screenshot
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, '#000000');
+    grad.addColorStop(0.5, '#070a0f');
+    grad.addColorStop(0.85, '#0b1118');
+    grad.addColorStop(1, '#111923');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Subtle architecture lights in distance
+    ctx.fillStyle = 'rgba(255, 230, 160, 0.4)';
+    for (let i = 0; i < 40; i++) {
+      const x = (i * 37) % w;
+      const y = h * 0.45 + ((i * 53) % (h * 0.25));
+      ctx.fillRect(x, y, 3, 3);
+    }
 
     const img = new Image();
     img.onload = () => {
-      state.logoImage = img;
-      DOM.logoPreviewImg.src = img.src;
-      DOM.logoPreviewImg.style.display = 'block';
-      DOM.logoPlaceholder.style.display = 'none';
-      DOM.btnRemoveLogo.style.display = 'inline-block';
-      renderActiveImage();
+      state.currentImage = {
+        file: { name: 'TimeMark_Sample.jpg' },
+        imgElement: img,
+        width: w,
+        height: h,
+        parsedDate: new Date()
+      };
+      DOM.tapToPickOverlay.style.display = 'none';
+      DOM.floatingActions.style.display = 'flex';
+      renderCanvas();
     };
-    img.src = canvas.toDataURL();
+    img.src = tempCanvas.toDataURL('image/jpeg', 0.9);
   }
 
-  function removeLogo() {
-    state.logoImage = null;
-    DOM.logoInput.value = '';
-    DOM.logoPreviewImg.src = '';
-    DOM.logoPreviewImg.style.display = 'none';
-    DOM.logoPlaceholder.style.display = 'flex';
-    DOM.btnRemoveLogo.style.display = 'none';
-    renderActiveImage();
+  // --- EDIT MODAL HANDLING ---
+  function openEditModal() {
+    syncDateTimeInput();
+    DOM.editAddress.value = state.address;
+    DOM.editTitle.value = state.title;
+    DOM.editDetails.value = state.details;
+    DOM.editPhone.value = state.phone;
+    DOM.rangeScale.value = state.scale;
+    DOM.valScale.textContent = `${state.scale}%`;
+    DOM.editModalOverlay.classList.add('active');
   }
 
-  // --- CANVAS RENDERING ENGINE ---
-  function renderActiveImage() {
-    if (state.activeIndex < 0 || state.activeIndex >= state.images.length) return;
-    const imgObj = state.images[state.activeIndex];
-    drawStampOnCanvas(DOM.previewCanvas, imgObj, state.config, state.isComparing);
+  function closeEditModal() {
+    DOM.editModalOverlay.classList.remove('active');
   }
 
-  /**
-   * Core function: Renders stamp onto target canvas at FULL image resolution
-   */
-  function drawStampOnCanvas(canvas, imgObj, config, isOriginalOnly = false) {
-    const img = imgObj.imgElement;
-    const w = imgObj.width;
-    const h = imgObj.height;
+  function applyModalChanges() {
+    if (DOM.editDateTime.value) {
+      state.dateTime = new Date(DOM.editDateTime.value);
+    }
+    state.address = DOM.editAddress.value.trim();
+    state.title = DOM.editTitle.value.trim();
+    state.details = DOM.editDetails.value.trim();
+    state.phone = DOM.editPhone.value.trim();
+    closeEditModal();
+    renderCanvas();
+    showToast("Đã cập nhật nội dung tem!", "success");
+  }
 
-    // Set canvas dimensions to full native resolution
+  // --- CANVAS RENDERING (PIXEL-ACCURATE TIMEMARK STAMP) ---
+  function renderCanvas() {
+    if (!state.currentImage) return;
+
+    const img = state.currentImage.imgElement;
+    const w = state.currentImage.width;
+    const h = state.currentImage.height;
+
+    const canvas = DOM.mainCanvas;
     canvas.width = w;
     canvas.height = h;
 
@@ -973,575 +390,397 @@
     // 1. Draw base photo
     ctx.drawImage(img, 0, 0, w, h);
 
-    // If comparing original, return immediately without stamp
-    if (isOriginalOnly) return;
+    // 2. Proportional scale factor based on image resolution
+    // Base 1080p width = 1.0 multiplier
+    const baseScale = Math.min(w, h) / 1080;
+    const userScale = state.scale / 100;
+    const s = baseScale * userScale;
 
-    // 2. Calculate proportional scale factor
-    // Base reference: 1920px image width/height = 1.0 multiplier
-    const maxDim = Math.max(w, h);
-    const baseMultiplier = maxDim / 1600;
-    const userScale = config.scale / 100;
-    const s = baseMultiplier * userScale;
+    // Date/Time parts
+    const d = state.dateTime;
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const timeStr = `${hours}:${minutes}`;
 
-    // Parse date for this specific image or config override
-    let stampDate = new Date();
-    if (config.dateTimeValue) {
-      stampDate = new Date(config.dateTimeValue);
-    } else if (imgObj.parsedDate) {
-      stampDate = imgObj.parsedDate;
-    }
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = d.getMonth() + 1;
+    const year = d.getFullYear();
+    // TimeMark format: "26 Tháng 10,2026"
+    const dateLineStr = `${day} Tháng ${month},${year}`;
+    const dayOfWeekStr = VN_DAYS[d.getDay()];
 
-    // Collect data payload
-    const data = {
-      date: stampDate,
-      timeStr: formatTimeString(stampDate, config.showSeconds),
-      dateStr: formatDate(stampDate, config.dateFormat),
-      dayOfWeek: getDayOfWeekName(stampDate, config.showDayOfWeek),
-      address: config.address || imgObj.address || '',
-      lat: config.lat || imgObj.lat || '',
-      lng: config.lng || imgObj.lng || '',
-      projectName: config.projectName,
-      workItem: config.workItem,
-      inspector: config.inspector,
-      notes: config.notes,
-      verifyCode: config.verifyCode,
-      camera: imgObj.camera || ''
-    };
-
-    // Render based on selected template
+    // Render Template
     ctx.save();
-    switch (config.template) {
-      case 'construction':
-        renderTemplateConstruction(ctx, w, h, s, data, config);
+    switch (state.template) {
+      case 'time_location':
+        renderTemplateTimeLocation(ctx, w, h, s, timeStr, dateLineStr, dayOfWeekStr, state.address);
         break;
-      case 'classic':
-        renderTemplateClassic(ctx, w, h, s, data, config);
+      case 'attendance':
+        renderTemplateAttendance(ctx, w, h, s, timeStr, `${day}/${month}/${year}`, state.address);
         break;
-      case 'inspection':
-        renderTemplateInspection(ctx, w, h, s, data, config);
+      case 'service':
+        renderTemplateService(ctx, w, h, s, state.title, `${day}/${month}/${year} ${timeStr}`, state.details, state.phone);
         break;
-      case 'minimalist':
-        renderTemplateMinimalist(ctx, w, h, s, data, config);
+      case 'completed':
+        renderTemplateCompleted(ctx, w, h, s, timeStr, `${day}/${month}/${year}`, state.address);
         break;
-      case 'hud_gps':
-        renderTemplateHudGps(ctx, w, h, s, data, config);
+      case 'project_report':
+        renderTemplateProjectReport(ctx, w, h, s, timeStr, `${day}/${month}/${year}`, state.title, state.details, state.address);
         break;
       default:
-        renderTemplateConstruction(ctx, w, h, s, data, config);
+        renderTemplateTimeLocation(ctx, w, h, s, timeStr, dateLineStr, dayOfWeekStr, state.address);
     }
     ctx.restore();
   }
 
-  // --- TEMPLATE 1: BÁO CÁO CÔNG TRÌNH (CONSTRUCTION) ---
-  function renderTemplateConstruction(ctx, imgW, imgH, s, data, config) {
-    const margin = config.margin * s;
-    const padding = 20 * s;
-    const boxWidth = Math.min(680 * s, imgW - margin * 2);
+  /**
+   * TEMPLATE 1: THỜI GIAN & VỊ TRÍ (The exact signature TimeMark watermark in screenshot)
+   * Format:
+   * 03:57 | 26 Tháng 10,2026
+   *       | Thứ Hai
+   * West Bay B - Kđt Ecopark KĐT Ecopark,
+   * X.Phụng Công, Hưng Yên
+   */
+  function renderTemplateTimeLocation(ctx, imgW, imgH, s, timeStr, dateStr, dayStr, address) {
+    const margin = 46 * s;
+    const timeFontSize = Math.round(92 * s);
+    const dateFontSize = Math.round(26 * s);
+    const addrFontSize = Math.round(24 * s);
+    const lineGap = Math.round(34 * s);
 
-    // Build line items
-    const lines = [];
-    if (config.showDateTime) {
-      lines.push({
-        icon: '🕒',
-        label: 'Thời gian:',
-        value: `${data.dateStr} (${data.dayOfWeek})`
-      });
-    }
-    if (config.showLocation && data.address) {
-      lines.push({
-        icon: '📍',
-        label: 'Vị trí:',
-        value: data.address
-      });
-    }
-    if (config.showLocation && config.showGpsCoords && data.lat && data.lng) {
-      lines.push({
-        icon: '🌐',
-        label: 'Tọa độ:',
-        value: formatCoordsDMS(data.lat, data.lng)
-      });
-    }
-    if (config.showProjectInfo) {
-      if (data.projectName) lines.push({ icon: '🏢', label: 'Dự án:', value: data.projectName });
-      if (data.workItem) lines.push({ icon: '📋', label: 'Hạng mục:', value: data.workItem });
-      if (data.inspector) lines.push({ icon: '👷', label: 'Người thực hiện:', value: data.inspector });
-      if (data.notes) lines.push({ icon: '📝', label: 'Ghi chú:', value: data.notes });
-      if (data.verifyCode) lines.push({ icon: '🔒', label: 'Mã xác thực:', value: `${data.verifyCode} (Chống sửa đổi)` });
-    }
+    // Setup text shadow so it's razor-sharp legible over ANY background
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+    ctx.shadowBlur = 6 * s;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 2 * s;
 
-    // Typography setup
-    const timeFontSize = Math.round(44 * s);
-    const labelFontSize = Math.round(18 * s);
-    const valueFontSize = Math.round(19 * s);
-    const lineHeight = Math.round(28 * s);
+    // Measure time text width
+    ctx.font = `600 ${timeFontSize}px "Oswald", "Plus Jakarta Sans", sans-serif`;
+    const timeWidth = ctx.measureText(timeStr).width;
 
-    // Estimate box height
-    let totalHeight = padding * 2;
-    if (config.showDateTime) {
-      totalHeight += timeFontSize + (16 * s); // Big time header + gap
-    }
+    // Amber bar dimensions
+    const barWidth = 3.5 * s;
+    const barHeight = timeFontSize * 0.88;
+    const barGap = 16 * s;
 
-    // Add height for lines with auto-wrap
-    const maxValWidth = boxWidth - padding * 2 - (150 * s);
-    ctx.font = `600 ${valueFontSize}px "Plus Jakarta Sans", sans-serif`;
-    
-    const computedRows = [];
-    lines.forEach(item => {
-      const wrapped = wrapTextLines(ctx, item.value, maxValWidth);
-      const rowHeight = Math.max(wrapped.length * lineHeight, lineHeight + 4 * s);
-      computedRows.push({ item, wrapped, rowHeight });
-      totalHeight += rowHeight + (6 * s);
+    // Wrap address text
+    ctx.font = `500 ${addrFontSize}px "Plus Jakarta Sans", sans-serif`;
+    const maxAddrWidth = Math.min(imgW - margin * 2, 700 * s);
+    const addrLines = [];
+    address.split('\n').forEach(part => {
+      const wrapped = wrapText(ctx, part.trim(), maxAddrWidth);
+      wrapped.forEach(l => addrLines.push(l));
     });
 
-    // Determine Box Position (X, Y)
-    const { boxX, boxY } = calculateBoxPosition(imgW, imgH, boxWidth, totalHeight, margin, config.position);
+    // Total height calculation
+    const headerHeight = timeFontSize;
+    const totalHeight = headerHeight + (18 * s) + (addrLines.length * lineGap);
 
-    // Draw Background Box
-    drawBackgroundBox(ctx, boxX, boxY, boxWidth, totalHeight, 14 * s, config);
+    // Positioning
+    const { startX, startY } = calculatePosition(imgW, imgH, margin, totalHeight, state.position);
 
-    // Draw Accent Left Bar
-    ctx.fillStyle = config.accentColor;
-    drawRoundedRect(ctx, boxX + 6 * s, boxY + 12 * s, 6 * s, totalHeight - 24 * s, 3 * s);
+    // 1. Draw Big Time "03:57"
+    ctx.font = `600 ${timeFontSize}px "Oswald", "Plus Jakarta Sans", sans-serif`;
+    ctx.fillStyle = state.textColor;
+    ctx.fillText(timeStr, startX, startY + timeFontSize * 0.85);
+
+    // 2. Draw Amber Vertical Bar "|"
+    const barX = startX + timeWidth + barGap;
+    const barY = startY + (timeFontSize * 0.05);
+
+    ctx.save();
+    ctx.fillStyle = state.amberColor;
+    ctx.shadowColor = 'transparent'; // Clean bar
+    drawRoundedBar(ctx, barX, barY, barWidth, barHeight, 2 * s);
     ctx.fill();
+    ctx.restore();
 
-    let curY = boxY + padding;
-    const contentX = boxX + padding + (10 * s);
+    // 3. Draw Date & Day of Week stacked next to bar
+    const textNextToBarX = barX + barWidth + barGap;
+    ctx.font = `600 ${dateFontSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillStyle = state.textColor;
 
-    // Draw Big Digital Clock & Logo Header
-    if (config.showDateTime) {
-      ctx.font = `700 ${timeFontSize}px "JetBrains Mono", "Oswald", monospace`;
-      ctx.fillStyle = config.textColor;
-      ctx.fillText(data.timeStr, contentX, curY + timeFontSize * 0.85);
+    // Line 1: Date "26 Tháng 10,2026"
+    ctx.fillText(dateStr, textNextToBarX, barY + dateFontSize * 0.95);
 
-      // Draw Logo if enabled
-      if (config.showLogo && state.logoImage) {
-        const logoSz = config.logoSize * s * 1.2;
-        const logoX = boxX + boxWidth - padding - logoSz;
-        const logoY = curY - 2 * s;
-        ctx.drawImage(state.logoImage, logoX, logoY, logoSz, logoSz);
-      }
+    // Line 2: Day "Thứ Hai"
+    ctx.fillText(dayStr, textNextToBarX, barY + (barHeight * 0.88));
 
-      curY += timeFontSize + (12 * s);
+    // 4. Draw Address Lines below
+    let curAddrY = startY + timeFontSize + (16 * s);
+    ctx.font = `500 ${addrFontSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
 
-      // Thin separator
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-      ctx.lineWidth = 1 * s;
-      ctx.beginPath();
-      ctx.moveTo(contentX, curY);
-      ctx.lineTo(boxX + boxWidth - padding, curY);
-      ctx.stroke();
-
-      curY += 12 * s;
-    }
-
-    // Draw Rows
-    computedRows.forEach(({ item, wrapped }) => {
-      // Icon and Label
-      ctx.font = `700 ${labelFontSize}px "Plus Jakarta Sans", sans-serif`;
-      ctx.fillStyle = config.accentColor;
-      const labelText = `${item.icon} ${item.label}`;
-      ctx.fillText(labelText, contentX, curY + labelFontSize * 0.85);
-
-      const valX = contentX + (135 * s);
-      ctx.font = `600 ${valueFontSize}px "Plus Jakarta Sans", sans-serif`;
-      ctx.fillStyle = config.textColor;
-
-      wrapped.forEach((line, lineIdx) => {
-        ctx.fillText(line, valX, curY + (lineIdx * lineHeight) + valueFontSize * 0.85);
-      });
-
-      curY += Math.max(wrapped.length * lineHeight, lineHeight) + (6 * s);
+    addrLines.forEach(line => {
+      ctx.fillText(line, startX, curAddrY + addrFontSize * 0.85);
+      curAddrY += lineGap;
     });
   }
 
-  // --- TEMPLATE 2: TIMEMARK CỔ ĐIỂN (CLASSIC) ---
-  function renderTemplateClassic(ctx, imgW, imgH, s, data, config) {
-    const margin = config.margin * s;
-    const padding = 20 * s;
-    const boxWidth = Math.min(620 * s, imgW - margin * 2);
+  /**
+   * TEMPLATE 2: ĐIỂM DANH (Yellow Tag Attendance)
+   */
+  function renderTemplateAttendance(ctx, imgW, imgH, s, timeStr, dateStr, address) {
+    const margin = 46 * s;
+    const tagFontSize = Math.round(22 * s);
+    const timeFontSize = Math.round(28 * s);
+    const bodyFontSize = Math.round(24 * s);
+    const lineGap = Math.round(34 * s);
 
-    const clockFontSize = Math.round(72 * s);
-    const subFontSize = Math.round(22 * s);
-    const infoFontSize = Math.round(18 * s);
-    const lineGap = Math.round(26 * s);
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+    ctx.shadowBlur = 6 * s;
+
+    // Measure widths
+    ctx.font = `800 ${tagFontSize}px "Plus Jakarta Sans", sans-serif`;
+    const tagW = ctx.measureText("Điểm danh").width + (16 * s);
+    const tagH = 34 * s;
+
+    ctx.font = `700 ${timeFontSize}px "JetBrains Mono", monospace`;
+    const timeW = ctx.measureText(timeStr).width + (18 * s);
 
     // Wrap address
-    ctx.font = `600 ${infoFontSize}px "Plus Jakarta Sans", sans-serif`;
-    const wrappedAddr = wrapTextLines(ctx, data.address || '', boxWidth - padding * 2);
-
-    let totalHeight = padding * 2 + clockFontSize + (14 * s) + subFontSize + (14 * s);
-    if (config.showLocation && data.address) {
-      totalHeight += wrappedAddr.length * lineGap + (10 * s);
-    }
-    if (config.showLocation && config.showGpsCoords && data.lat && data.lng) {
-      totalHeight += lineGap;
-    }
-    if (config.showProjectInfo && data.projectName) {
-      totalHeight += lineGap;
-    }
-
-    const { boxX, boxY } = calculateBoxPosition(imgW, imgH, boxWidth, totalHeight, margin, config.position);
-    drawBackgroundBox(ctx, boxX, boxY, boxWidth, totalHeight, 14 * s, config);
-
-    let curY = boxY + padding;
-    const contentX = boxX + padding;
-
-    // Big Time
-    ctx.font = `700 ${clockFontSize}px "Oswald", "JetBrains Mono", sans-serif`;
-    ctx.fillStyle = config.accentColor;
-    ctx.fillText(data.timeStr, contentX, curY + clockFontSize * 0.85);
-
-    // Logo at top right if enabled
-    if (config.showLogo && state.logoImage) {
-      const logoSz = config.logoSize * s * 1.3;
-      ctx.drawImage(state.logoImage, boxX + boxWidth - padding - logoSz, curY, logoSz, logoSz);
-    }
-
-    curY += clockFontSize + 8 * s;
-
-    // Date & Day of week
-    ctx.font = `700 ${subFontSize}px "Plus Jakarta Sans", sans-serif`;
-    ctx.fillStyle = config.textColor;
-    const dateRow = `${data.dayOfWeek}, ${data.dateStr}  •  ⛅ 31°C`;
-    ctx.fillText(dateRow, contentX, curY + subFontSize * 0.85);
-
-    curY += subFontSize + 14 * s;
-
-    // Separator
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 1.5 * s;
-    ctx.beginPath();
-    ctx.moveTo(contentX, curY);
-    ctx.lineTo(boxX + boxWidth - padding, curY);
-    ctx.stroke();
-
-    curY += 14 * s;
-
-    // Address
-    if (config.showLocation && data.address) {
-      ctx.font = `600 ${infoFontSize}px "Plus Jakarta Sans", sans-serif`;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-      wrappedAddr.forEach(line => {
-        ctx.fillText(`📍 ${line}`, contentX, curY + infoFontSize * 0.85);
-        curY += lineGap;
-      });
-    }
-
-    // GPS
-    if (config.showLocation && config.showGpsCoords && data.lat && data.lng) {
-      ctx.font = `500 ${infoFontSize - 2 * s}px "JetBrains Mono", monospace`;
-      ctx.fillStyle = config.accentColor;
-      ctx.fillText(`🌐 GPS: ${data.lat}° N, ${data.lng}° E`, contentX, curY + infoFontSize * 0.85);
-      curY += lineGap;
-    }
-
-    // Project Name
-    if (config.showProjectInfo && data.projectName) {
-      ctx.font = `700 ${infoFontSize}px "Plus Jakarta Sans", sans-serif`;
-      ctx.fillStyle = '#facc15';
-      ctx.fillText(`🏢 ${data.projectName} - ${data.workItem || ''}`, contentX, curY + infoFontSize * 0.85);
-    }
-  }
-
-  // --- TEMPLATE 3: THẺ NGHIỆM THU / GIÁM SÁT (INSPECTION) ---
-  function renderTemplateInspection(ctx, imgW, imgH, s, data, config) {
-    const margin = config.margin * s;
-    const padding = 22 * s;
-    const boxWidth = Math.min(660 * s, imgW - margin * 2);
-
-    const titleFontSize = Math.round(20 * s);
-    const contentFontSize = Math.round(18 * s);
-    const lineGap = Math.round(28 * s);
-
-    let totalHeight = padding * 2 + (54 * s) + (14 * s); // Header badge area
-
-    const rows = [];
-    if (config.showDateTime) {
-      rows.push({ label: 'THỜI GIAN', val: `${data.dateStr} - ${data.timeStr} (${data.dayOfWeek})` });
-    }
-    if (config.showLocation && data.address) {
-      rows.push({ label: 'ĐỊA ĐIỂM', val: data.address });
-    }
-    if (config.showLocation && config.showGpsCoords && data.lat && data.lng) {
-      rows.push({ label: 'TỌA ĐỘ GPS', val: `${data.lat}° N, ${data.lng}° E` });
-    }
-    if (config.showProjectInfo) {
-      if (data.projectName) rows.push({ label: 'DỰ ÁN', val: data.projectName });
-      if (data.workItem) rows.push({ label: 'HẠNG MỤC', val: data.workItem });
-      if (data.inspector) rows.push({ label: 'GIÁM SÁT', val: data.inspector });
-      if (data.verifyCode) rows.push({ label: 'SỐ BIÊN BẢN', val: data.verifyCode });
-    }
-
-    ctx.font = `600 ${contentFontSize}px "Plus Jakarta Sans", sans-serif`;
-    const wrappedRows = [];
-    rows.forEach(r => {
-      const wrapped = wrapTextLines(ctx, r.val, boxWidth - padding * 2 - (140 * s));
-      wrappedRows.push({ label: r.label, wrapped });
-      totalHeight += wrapped.length * lineGap + (6 * s);
+    ctx.font = `500 ${bodyFontSize}px "Plus Jakarta Sans", sans-serif`;
+    const maxAddrWidth = Math.min(imgW - margin * 2 - (24 * s), 700 * s);
+    const addrLines = [];
+    address.split('\n').forEach(part => {
+      const wrapped = wrapText(ctx, part.trim(), maxAddrWidth);
+      wrapped.forEach(l => addrLines.push(l));
     });
 
-    const { boxX, boxY } = calculateBoxPosition(imgW, imgH, boxWidth, totalHeight, margin, config.position);
-    drawBackgroundBox(ctx, boxX, boxY, boxWidth, totalHeight, 16 * s, config);
+    const totalHeight = tagH + (16 * s) + lineGap + (addrLines.length * lineGap);
+    const { startX, startY } = calculatePosition(imgW, imgH, margin, totalHeight, state.position);
 
-    // Draw Top Header Badge: "PHIẾU KIỂM TRA HIỆN TRƯỜNG" + "ĐÃ NGHIỆM THU"
-    let curY = boxY + padding;
-    const contentX = boxX + padding;
-
-    // Header Title
-    ctx.font = `800 ${titleFontSize}px "Plus Jakarta Sans", sans-serif`;
-    ctx.fillStyle = config.textColor;
-    ctx.fillText("BIÊN BẢN HÌNH ẢNH HIỆN TRƯỜNG", contentX, curY + titleFontSize * 0.85);
-
-    // Verified Stamp Tag
-    const tagText = "✓ ĐÃ NGHIỆM THU";
-    ctx.font = `800 ${Math.round(14 * s)}px "Plus Jakarta Sans", sans-serif`;
-    const tagW = ctx.measureText(tagText).width + (16 * s);
-    const tagH = 26 * s;
-    const tagX = boxX + boxWidth - padding - tagW;
-    const tagY = curY;
-
-    ctx.fillStyle = '#059669'; // Green verified badge
-    drawRoundedRect(ctx, tagX, tagY, tagW, tagH, 6 * s);
+    // Tag: [Điểm danh]
+    ctx.save();
+    ctx.fillStyle = '#f59e0b';
+    ctx.shadowColor = 'transparent';
+    drawRoundedBar(ctx, startX, startY, tagW, tagH, 6 * s);
     ctx.fill();
+    ctx.fillStyle = '#000000';
+    ctx.font = `800 ${tagFontSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillText("Điểm danh", startX + (8 * s), startY + tagFontSize * 1.15);
+    ctx.restore();
 
+    // Time Box: [23:40]
+    ctx.save();
+    const timeBoxX = startX + tagW + (6 * s);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(tagText, tagX + (8 * s), tagY + (18 * s));
+    ctx.shadowColor = 'transparent';
+    drawRoundedBar(ctx, timeBoxX, startY, timeW, tagH, 6 * s);
+    ctx.fill();
+    ctx.fillStyle = '#000000';
+    ctx.font = `800 ${timeFontSize}px "JetBrains Mono", monospace`;
+    ctx.fillText(timeStr, timeBoxX + (8 * s), startY + timeFontSize * 0.95);
+    ctx.restore();
 
-    curY += 36 * s;
+    // Body with Amber Vertical Line
+    const bodyStartY = startY + tagH + (12 * s);
+    const barHeight = (1 + addrLines.length) * lineGap - (8 * s);
+    const barX = startX;
 
-    // Double line divider
-    ctx.strokeStyle = config.accentColor;
-    ctx.lineWidth = 2 * s;
-    ctx.beginPath();
-    ctx.moveTo(contentX, curY);
-    ctx.lineTo(boxX + boxWidth - padding, curY);
-    ctx.stroke();
+    ctx.save();
+    ctx.fillStyle = state.amberColor;
+    ctx.shadowColor = 'transparent';
+    drawRoundedBar(ctx, barX, bodyStartY, 3.5 * s, barHeight, 2 * s);
+    ctx.fill();
+    ctx.restore();
 
-    curY += 14 * s;
+    const textX = barX + (14 * s);
+    let curY = bodyStartY;
 
-    // Draw Table Rows
-    wrappedRows.forEach(({ label, wrapped }) => {
-      ctx.font = `700 ${contentFontSize - 2 * s}px "Plus Jakarta Sans", sans-serif`;
-      ctx.fillStyle = config.accentColor;
-      ctx.fillText(label, contentX, curY + contentFontSize * 0.85);
+    ctx.font = `600 ${bodyFontSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(dateStr, textX, curY + bodyFontSize * 0.85);
 
-      const valX = contentX + (130 * s);
-      ctx.font = `600 ${contentFontSize}px "Plus Jakarta Sans", sans-serif`;
-      ctx.fillStyle = config.textColor;
-
-      wrapped.forEach((line, lIdx) => {
-        ctx.fillText(line, valX, curY + (lIdx * lineGap) + contentFontSize * 0.85);
-      });
-
-      curY += wrapped.length * lineGap + (6 * s);
+    curY += lineGap;
+    ctx.font = `500 ${bodyFontSize}px "Plus Jakarta Sans", sans-serif`;
+    addrLines.forEach(l => {
+      ctx.fillText(l, textX, curY + bodyFontSize * 0.85);
+      curY += lineGap;
     });
   }
 
-  // --- TEMPLATE 4: TỐI GIẢN (MINIMALIST) ---
-  function renderTemplateMinimalist(ctx, imgW, imgH, s, data, config) {
-    const margin = config.margin * s;
-    const padding = 16 * s;
-    const boxWidth = Math.min(580 * s, imgW - margin * 2);
+  /**
+   * TEMPLATE 3: DỊCH VỤ / CÔNG VIỆC
+   */
+  function renderTemplateService(ctx, imgW, imgH, s, title, dateStr, details, phone) {
+    const margin = 46 * s;
+    const titleFontSize = Math.round(30 * s);
+    const bodyFontSize = Math.round(23 * s);
+    const lineGap = Math.round(32 * s);
 
-    const timeFontSize = Math.round(36 * s);
-    const subFontSize = Math.round(18 * s);
-    const lineGap = Math.round(24 * s);
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+    ctx.shadowBlur = 6 * s;
 
-    ctx.font = `600 ${subFontSize}px "Plus Jakarta Sans", sans-serif`;
-    const wrappedAddr = wrapTextLines(ctx, data.address || '', boxWidth - padding * 2);
+    const totalHeight = titleFontSize + (16 * s) + (3 * lineGap);
+    const { startX, startY } = calculatePosition(imgW, imgH, margin, totalHeight, state.position);
 
-    let totalHeight = padding * 2 + timeFontSize + (12 * s);
-    if (config.showLocation && data.address) {
-      totalHeight += wrappedAddr.length * lineGap + (6 * s);
-    }
-    if (config.showProjectInfo && data.projectName) {
-      totalHeight += lineGap;
-    }
+    // Title
+    ctx.font = `700 ${titleFontSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(title || 'Tên dịch vụ', startX, startY + titleFontSize * 0.85);
 
-    const { boxX, boxY } = calculateBoxPosition(imgW, imgH, boxWidth, totalHeight, margin, config.position);
+    // Amber bar
+    const bodyStartY = startY + titleFontSize + (12 * s);
+    const barHeight = (3 * lineGap) - (6 * s);
 
-    // Minimalist transparent dark pill
-    drawBackgroundBox(ctx, boxX, boxY, boxWidth, totalHeight, 10 * s, config);
+    ctx.save();
+    ctx.fillStyle = state.amberColor;
+    ctx.shadowColor = 'transparent';
+    drawRoundedBar(ctx, startX, bodyStartY, 3.5 * s, barHeight, 2 * s);
+    ctx.fill();
+    ctx.restore();
 
-    let curY = boxY + padding;
-    const contentX = boxX + padding;
+    const textX = startX + (14 * s);
+    let curY = bodyStartY;
 
-    // Time & Date in 1 clean line
-    ctx.font = `700 ${timeFontSize}px "JetBrains Mono", sans-serif`;
-    ctx.fillStyle = config.textColor;
-    ctx.fillText(`${data.timeStr} | ${data.dateStr}`, contentX, curY + timeFontSize * 0.85);
+    ctx.font = `600 ${bodyFontSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(dateStr, textX, curY + bodyFontSize * 0.85);
 
-    curY += timeFontSize + (12 * s);
+    curY += lineGap;
+    ctx.fillText(`👉 : ${details || 'Chi tiết dịch vụ'}`, textX, curY + bodyFontSize * 0.85);
 
-    if (config.showLocation && data.address) {
-      ctx.font = `600 ${subFontSize}px "Plus Jakarta Sans", sans-serif`;
-      ctx.fillStyle = config.accentColor;
-      wrappedAddr.forEach(line => {
-        ctx.fillText(`📍 ${line}`, contentX, curY + subFontSize * 0.85);
-        curY += lineGap;
-      });
-    }
-
-    if (config.showProjectInfo && data.projectName) {
-      ctx.font = `600 ${subFontSize}px "Plus Jakarta Sans", sans-serif`;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-      ctx.fillText(`${data.projectName} • ${data.workItem || ''}`, contentX, curY + subFontSize * 0.85);
-    }
+    curY += lineGap;
+    ctx.fillText(`☎ : ${phone || '0123456666'}`, textX, curY + bodyFontSize * 0.85);
   }
 
-  // --- TEMPLATE 5: HUD TỌA ĐỘ GPS (TECHNICAL HUD) ---
-  function renderTemplateHudGps(ctx, imgW, imgH, s, data, config) {
-    const margin = config.margin * s;
-    const padding = 20 * s;
-    const boxWidth = Math.min(620 * s, imgW - margin * 2);
+  /**
+   * TEMPLATE 4: ĐÃ HOÀN THÀNH (Task Completed)
+   */
+  function renderTemplateCompleted(ctx, imgW, imgH, s, timeStr, dateStr, address) {
+    const margin = 46 * s;
+    const badgeFontSize = Math.round(22 * s);
+    const titleFontSize = Math.round(28 * s);
+    const bodyFontSize = Math.round(24 * s);
+    const lineGap = Math.round(34 * s);
 
-    const monoFontSize = Math.round(20 * s);
-    const subFontSize = Math.round(16 * s);
-    const lineGap = Math.round(26 * s);
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+    ctx.shadowBlur = 6 * s;
 
-    let totalHeight = padding * 2 + (4 * lineGap) + (10 * s);
-    if (config.showLocation && data.address) totalHeight += lineGap;
+    ctx.font = `800 ${badgeFontSize}px "Plus Jakarta Sans", sans-serif`;
+    const badgeText = `${timeStr} ✓`;
+    const badgeW = ctx.measureText(badgeText).width + (18 * s);
+    const badgeH = 32 * s;
 
-    const { boxX, boxY } = calculateBoxPosition(imgW, imgH, boxWidth, totalHeight, margin, config.position);
+    const totalHeight = badgeH + (8 * s) + titleFontSize + (14 * s) + (2 * lineGap);
+    const { startX, startY } = calculatePosition(imgW, imgH, margin, totalHeight, state.position);
 
-    // Dark technical HUD box
-    drawBackgroundBox(ctx, boxX, boxY, boxWidth, totalHeight, 6 * s, config);
+    // Green badge: [09:30 ✓]
+    ctx.save();
+    ctx.fillStyle = '#00c06d';
+    ctx.shadowColor = 'transparent';
+    drawRoundedBar(ctx, startX, startY, badgeW, badgeH, 6 * s);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `800 ${badgeFontSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillText(badgeText, startX + (9 * s), startY + badgeFontSize * 1.05);
+    ctx.restore();
 
-    // Draw HUD Corner Brackets
-    ctx.strokeStyle = config.accentColor;
-    ctx.lineWidth = 2.5 * s;
-    const bLen = 14 * s;
+    // Bold title: "Đã hoàn thành"
+    const titleY = startY + badgeH + (12 * s);
+    ctx.font = `800 ${titleFontSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText("Đã hoàn thành", startX, titleY + titleFontSize * 0.85);
 
-    // Top-Left
-    ctx.beginPath();
-    ctx.moveTo(boxX, boxY + bLen); ctx.lineTo(boxX, boxY); ctx.lineTo(boxX + bLen, boxY);
-    ctx.stroke();
-    // Top-Right
-    ctx.beginPath();
-    ctx.moveTo(boxX + boxWidth - bLen, boxY); ctx.lineTo(boxX + boxWidth, boxY); ctx.lineTo(boxX + boxWidth, boxY + bLen);
-    ctx.stroke();
-    // Bottom-Left
-    ctx.beginPath();
-    ctx.moveTo(boxX, boxY + totalHeight - bLen); ctx.lineTo(boxX, boxY + totalHeight); ctx.lineTo(boxX + bLen, boxY + totalHeight);
-    ctx.stroke();
-    // Bottom-Right
-    ctx.beginPath();
-    ctx.moveTo(boxX + boxWidth - bLen, boxY + totalHeight); ctx.lineTo(boxX + boxWidth, boxY + totalHeight); ctx.lineTo(boxX + boxWidth, boxY + totalHeight - bLen);
-    ctx.stroke();
+    // Amber bar below
+    const bodyStartY = titleY + titleFontSize + (10 * s);
+    const barHeight = (2 * lineGap) - (6 * s);
 
-    let curY = boxY + padding;
-    const contentX = boxX + padding;
+    ctx.save();
+    ctx.fillStyle = state.amberColor;
+    ctx.shadowColor = 'transparent';
+    drawRoundedBar(ctx, startX, bodyStartY, 3.5 * s, barHeight, 2 * s);
+    ctx.fill();
+    ctx.restore();
 
-    // Technical Coordinates Line
-    ctx.font = `700 ${monoFontSize}px "JetBrains Mono", monospace`;
-    ctx.fillStyle = config.accentColor;
-    ctx.fillText(`⌖ LAT: ${data.lat || '0.000000'}° N`, contentX, curY + monoFontSize * 0.85);
-    ctx.fillText(`  LNG: ${data.lng || '0.000000'}° E`, contentX + (260 * s), curY + monoFontSize * 0.85);
+    const textX = startX + (14 * s);
+    let curY = bodyStartY;
+
+    ctx.font = `600 ${bodyFontSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(dateStr, textX, curY + bodyFontSize * 0.85);
 
     curY += lineGap;
+    ctx.font = `500 ${bodyFontSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillText(address.split('\n')[0], textX, curY + bodyFontSize * 0.85);
+  }
 
-    // Time & Timestamp
-    ctx.font = `600 ${monoFontSize - 2 * s}px "JetBrains Mono", monospace`;
-    ctx.fillStyle = config.textColor;
-    ctx.fillText(`⏱ UTC+7 : ${data.dateStr} ${data.timeStr}`, contentX, curY + monoFontSize * 0.85);
+  /**
+   * TEMPLATE 5: CÔNG TRÌNH & DỰ ÁN (Detailed Project Format)
+   */
+  function renderTemplateProjectReport(ctx, imgW, imgH, s, timeStr, dateStr, title, details, address) {
+    const margin = 46 * s;
+    const timeFontSize = Math.round(64 * s);
+    const bodyFontSize = Math.round(22 * s);
+    const lineGap = Math.round(30 * s);
 
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+    ctx.shadowBlur = 6 * s;
+
+    const totalHeight = timeFontSize + (16 * s) + (4 * lineGap);
+    const { startX, startY } = calculatePosition(imgW, imgH, margin, totalHeight, state.position);
+
+    // Time
+    ctx.font = `700 ${timeFontSize}px "JetBrains Mono", sans-serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(timeStr, startX, startY + timeFontSize * 0.85);
+
+    // Horizontal Accent Line
+    const lineY = startY + timeFontSize + (8 * s);
+    ctx.save();
+    ctx.fillStyle = '#0084ff';
+    ctx.shadowColor = 'transparent';
+    ctx.fillRect(startX, lineY, 260 * s, 3.5 * s);
+    ctx.restore();
+
+    let curY = lineY + (14 * s);
+    ctx.font = `600 ${bodyFontSize}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillStyle = '#ffffff';
+
+    ctx.fillText(`🕒 Thời gian: ${dateStr}`, startX, curY + bodyFontSize * 0.85);
     curY += lineGap;
 
-    // Address
-    if (config.showLocation && data.address) {
-      ctx.font = `500 ${subFontSize}px "Plus Jakarta Sans", sans-serif`;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-      ctx.fillText(`LOC: ${data.address}`, contentX, curY + subFontSize * 0.85);
-      curY += lineGap;
-    }
+    ctx.fillText(`🏢 Dự án: ${title || 'West Bay B - Ecopark'}`, startX, curY + bodyFontSize * 0.85);
+    curY += lineGap;
 
-    // Camera & Verification
-    ctx.font = `500 ${subFontSize - 2 * s}px "JetBrains Mono", monospace`;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.fillText(`DEV: ${data.camera || 'Standard Camera'}  |  SIG: ${data.verifyCode}`, contentX, curY + subFontSize * 0.85);
+    ctx.fillText(`📋 Hạng mục: ${details || 'Nghiệm thu hiện trường'}`, startX, curY + bodyFontSize * 0.85);
+    curY += lineGap;
+
+    ctx.fillText(`📍 Vị trí: ${address.split('\n')[0]}`, startX, curY + bodyFontSize * 0.85);
   }
 
   // --- DRAWING HELPERS ---
-  function calculateBoxPosition(imgW, imgH, boxW, boxH, margin, pos) {
-    let boxX = margin;
-    let boxY = imgH - boxH - margin;
+  function calculatePosition(imgW, imgH, margin, totalH, pos) {
+    let startX = margin;
+    let startY = imgH - totalH - margin;
 
     switch (pos) {
       case 'bottom-left':
-        boxX = margin;
-        boxY = imgH - boxH - margin;
+        startX = margin;
+        startY = imgH - totalH - margin;
         break;
       case 'bottom-center':
-        boxX = (imgW - boxW) / 2;
-        boxY = imgH - boxH - margin;
+        startX = imgW * 0.15;
+        startY = imgH - totalH - margin;
         break;
       case 'bottom-right':
-        boxX = imgW - boxW - margin;
-        boxY = imgH - boxH - margin;
+        startX = imgW * 0.35;
+        startY = imgH - totalH - margin;
         break;
       case 'top-left':
-        boxX = margin;
-        boxY = margin;
-        break;
-      case 'top-center':
-        boxX = (imgW - boxW) / 2;
-        boxY = margin;
+        startX = margin;
+        startY = margin;
         break;
       case 'top-right':
-        boxX = imgW - boxW - margin;
-        boxY = margin;
+        startX = imgW * 0.35;
+        startY = margin;
         break;
     }
-
-    return { boxX, boxY };
+    return { startX, startY };
   }
 
-  function drawBackgroundBox(ctx, x, y, w, h, radius, config) {
-    const opacity = (config.bgOpacity / 100);
-
-    ctx.save();
-    // Drop shadow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    ctx.shadowBlur = 16;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 6;
-
-    let fill = `rgba(15, 23, 42, ${opacity})`;
-    let border = `rgba(255, 255, 255, 0.15)`;
-
-    switch (config.bgStyle) {
-      case 'solid-dark':
-        fill = `rgba(11, 15, 25, 1)`;
-        break;
-      case 'navy':
-        fill = `rgba(10, 25, 47, ${opacity})`;
-        border = `rgba(0, 229, 255, 0.3)`;
-        break;
-      case 'glass-light':
-        fill = `rgba(255, 255, 255, ${opacity * 0.85})`;
-        border = `rgba(0, 0, 0, 0.15)`;
-        break;
-      case 'transparent':
-        fill = 'transparent';
-        border = 'transparent';
-        ctx.shadowColor = 'transparent';
-        break;
-    }
-
-    drawRoundedRect(ctx, x, y, w, h, radius);
-    ctx.fillStyle = fill;
-    ctx.fill();
-
-    if (border !== 'transparent') {
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = border;
-      ctx.stroke();
-    }
-
-    ctx.restore();
-  }
-
-  function drawRoundedRect(ctx, x, y, width, height, radius) {
+  function drawRoundedBar(ctx, x, y, width, height, radius) {
     ctx.beginPath();
     ctx.moveTo(x + radius, y);
     ctx.lineTo(x + width - radius, y);
@@ -1555,9 +794,9 @@
     ctx.closePath();
   }
 
-  function wrapTextLines(ctx, text, maxWidth) {
+  function wrapText(ctx, text, maxWidth) {
     if (!text) return [];
-    const words = String(text).split(' ');
+    const words = text.split(' ');
     const lines = [];
     let currentLine = words[0];
 
@@ -1575,214 +814,52 @@
     return lines;
   }
 
-  function formatTimeString(date, showSeconds = true) {
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    return showSeconds ? `${hours}:${minutes}:${seconds}` : `${hours}:${minutes}`;
-  }
-
-  function formatDate(date, format) {
-    const yyyy = date.getFullYear();
-    const MM = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
-    const HH = String(date.getHours()).padStart(2, '0');
-    const mm = String(date.getMinutes()).padStart(2, '0');
-    const ss = String(date.getSeconds()).padStart(2, '0');
-
-    let out = format;
-    out = out.replace('yyyy', yyyy);
-    out = out.replace('MM', MM);
-    out = out.replace('dd', dd);
-    out = out.replace('HH', HH);
-    out = out.replace('mm', mm);
-    out = out.replace('ss', ss);
-    return out;
-  }
-
-  function formatToDatetimeLocal(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-  }
-
-  function getDayOfWeekName(date, isEnabled) {
-    if (!isEnabled) return '';
-    return VN_DAYS[date.getDay()];
-  }
-
-  function formatCoordsDMS(latStr, lngStr) {
-    const lat = parseFloat(latStr);
-    const lng = parseFloat(lngStr);
-    if (isNaN(lat) || isNaN(lng)) return `${latStr}, ${lngStr}`;
-
-    const toDMS = (deg, isLat) => {
-      const dir = isLat ? (deg >= 0 ? 'N' : 'S') : (deg >= 0 ? 'E' : 'W');
-      const absDeg = Math.abs(deg);
-      const d = Math.floor(absDeg);
-      const minFloat = (absDeg - d) * 60;
-      const m = Math.floor(minFloat);
-      const s = ((minFloat - m) * 60).toFixed(1);
-      return `${d}°${m}'${s}" ${dir}`;
-    };
-
-    return `${toDMS(lat, true)}, ${toDMS(lng, false)}`;
-  }
-
-  function formatBytes(bytes) {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  }
-
   // --- EXPORT & DOWNLOAD ---
-  async function downloadCurrentSingle() {
-    if (state.activeIndex < 0) return;
-    const imgObj = state.images[state.activeIndex];
-    
-    showLoading(true, "Đang kết xuất ảnh chất lượng cao...");
-
-    setTimeout(() => {
-      // Re-draw onto a clean full-res canvas
-      const exportCanvas = document.createElement('canvas');
-      drawStampOnCanvas(exportCanvas, imgObj, state.config, false);
-
-      const format = state.config.exportFormat;
-      const quality = state.config.exportQuality;
-      const ext = format === 'image/png' ? 'png' : 'jpg';
-
-      exportCanvas.toBlob((blob) => {
-        showLoading(false);
-        if (!blob) {
-          showToast("Lỗi khi kết xuất ảnh", "error");
-          return;
-        }
-
-        const originalName = imgObj.file.name.replace(/\.[^/.]+$/, "");
-        const fileName = `${originalName}_TimeMark.${ext}`;
-
-        triggerDownload(blob, fileName);
-        showToast(`Đã xuất ảnh thành công: ${fileName}`, 'success');
-      }, format, quality);
-    }, 50);
-  }
-
-  async function downloadAllBatchZip() {
-    if (state.images.length === 0) return;
-    if (!window.JSZip) {
-      showToast("Thư viện JSZip chưa sẵn sàng.", "error");
+  function downloadStampedPhoto() {
+    if (!state.currentImage) {
+      showToast("Vui lòng chọn ảnh trước!", "error");
       return;
     }
 
-    const zip = new window.JSZip();
-    const count = state.images.length;
-    const format = state.config.exportFormat;
-    const quality = state.config.exportQuality;
-    const ext = format === 'image/png' ? 'png' : 'jpg';
+    showToast("Đang kết xuất ảnh nét gốc...", "info");
 
-    // Show progress bar
-    DOM.batchProgressBarWrapper.style.display = 'flex';
-    DOM.btnBatchDownload.disabled = true;
-    DOM.btnBatchDownloadBottom.disabled = true;
+    setTimeout(() => {
+      DOM.mainCanvas.toBlob((blob) => {
+        if (!blob) {
+          showToast("Lỗi kết xuất ảnh", "error");
+          return;
+        }
 
-    for (let i = 0; i < count; i++) {
-      const imgObj = state.images[i];
-      const pct = Math.round(((i + 1) / count) * 100);
-      DOM.batchProgressText.textContent = `Đang xử lý ảnh ${i + 1}/${count} (${imgObj.file.name})...`;
-      DOM.batchProgressPercent.textContent = `${pct}%`;
-      DOM.batchProgressBarFill.style.width = `${pct}%`;
+        const dateTag = state.dateTime.toISOString().slice(0, 10).replace(/-/g, "");
+        const fileName = `TimeMark_${dateTag}_${Date.now().toString().slice(-4)}.jpg`;
 
-      // Allow UI update
-      await new Promise(r => setTimeout(r, 20));
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
 
-      const canvas = document.createElement('canvas');
-      drawStampOnCanvas(canvas, imgObj, state.config, false);
-
-      const blob = await new Promise((res) => canvas.toBlob(res, format, quality));
-      const originalName = imgObj.file.name.replace(/\.[^/.]+$/, "");
-      zip.file(`${originalName}_TimeMark.${ext}`, blob);
-    }
-
-    DOM.batchProgressText.textContent = "Đang nén file ZIP...";
-    const zipBlob = await zip.generateAsync({ type: "blob" });
-
-    DOM.batchProgressBarWrapper.style.display = 'none';
-    DOM.btnBatchDownload.disabled = false;
-    DOM.btnBatchDownloadBottom.disabled = false;
-
-    const zipName = `TimeMark_Batch_${Date.now()}.zip`;
-    triggerDownload(zipBlob, zipName);
-    showToast(`Đã tải về toàn bộ ${count} ảnh trong file ZIP!`, 'success');
-  }
-
-  function triggerDownload(blob, filename) {
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(link.href), 5000);
-  }
-
-  function toggleCompare(showOriginal) {
-    state.isComparing = showOriginal;
-    DOM.lblCompare.textContent = showOriginal ? "Đang xem ảnh gốc..." : "Xem ảnh gốc";
-    renderActiveImage();
-  }
-
-  function resetAllSettings() {
-    if (!confirm("Bạn có chắc chắn muốn đặt lại toàn bộ cài đặt về mặc định?")) return;
-    
-    state.config.template = 'construction';
-    state.config.position = 'bottom-left';
-    state.config.scale = 100;
-    state.config.margin = 30;
-    state.config.bgStyle = 'glass-dark';
-    state.config.bgOpacity = 75;
-    state.config.accentColor = '#00E5FF';
-    state.config.textColor = '#FFFFFF';
-    state.config.showDateTime = true;
-    state.config.showLocation = true;
-    state.config.showProjectInfo = true;
-    state.config.showLogo = true;
-
-    // Reset template card selection UI
-    DOM.templateCards.forEach(c => c.classList.toggle('active', c.dataset.template === 'construction'));
-    DOM.posButtons.forEach(b => b.classList.toggle('active', b.dataset.pos === 'bottom-left'));
-
-    syncFormFromConfig();
-    createDefaultSampleLogo();
-    setCurrentDateTime();
-    renderActiveImage();
-    showToast("Đã đặt lại cài đặt về mặc định.", "info");
-  }
-
-  function showLoading(show, message = "Đang xử lý...") {
-    DOM.renderLoadingOverlay.style.display = show ? 'flex' : 'none';
-    DOM.loadingMessage.textContent = message;
+        setTimeout(() => URL.revokeObjectURL(link.href), 4000);
+        showToast("Đã lưu ảnh vào máy thành công! 🎉", "success");
+      }, 'image/jpeg', 0.95);
+    }, 100);
   }
 
   function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    toast.innerHTML = `<span>${message}</span>`;
+    toast.textContent = message;
     DOM.toastContainer.appendChild(toast);
 
     setTimeout(() => {
       toast.style.opacity = '0';
-      toast.style.transform = 'translateX(40px)';
-      setTimeout(() => toast.remove(), 300);
-    }, 3500);
+      toast.style.transform = 'translateY(-10px)';
+      setTimeout(() => toast.remove(), 250);
+    }, 2800);
   }
 
-  // Run init on DOMContentLoaded
+  // Run init
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
