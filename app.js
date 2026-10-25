@@ -82,8 +82,11 @@
 
   // --- INITIALIZATION ---
   async function init() {
-    // Wait for Google Fonts to be ready so canvas renders crisp Bebas Neue / Barlow
-    if (document.fonts && document.fonts.ready) {
+    // Explicitly load Google Fonts and trigger redraw once available
+    if (document.fonts) {
+      document.fonts.load('80px "Teko"').then(() => renderCanvas());
+      document.fonts.load('80px "Bebas Neue"').then(() => renderCanvas());
+      document.fonts.load('20px "Plus Jakarta Sans"').then(() => renderCanvas());
       document.fonts.ready.then(() => renderCanvas());
     }
 
@@ -459,18 +462,22 @@
   /**
    * TEMPLATE 1: THỜI GIAN & VỊ TRÍ
    * Pixel-exact replica of genuine TimeMark watermark:
+   * Clock aspect ratio: 163px width / 74px height on 768w photo (slender, ultra-condensed)
    * 04:07 | 26 Tháng 10,2026
    *       | Thứ Hai
    * West Bay B - Kđt Ecopark KĐT Ecopark,
    * X.Phụng Công, Hưng Yên
    */
   function renderTemplateTimeLocation(ctx, imgW, imgH, s, timeStr, dateStr, dayStr, address) {
-    const margin = 22 * s;
-    const clockHeight = 76 * s;
-    const clockFontSize = Math.round(92 * s);
-    const dateFontSize = Math.round(23 * s);
-    const dayFontSize = Math.round(20 * s);
-    const addrFontSize = Math.round(22 * s);
+    const margin = 21 * s;
+    const clockHeight = 74 * s;
+    const targetClockWidth = 163 * s; // Exact TimeMark 163px width
+    const barGap = 25 * s;
+    const dateGap = 14 * s;
+    const barWidth = 2.5 * s;
+    const barHeight = 75 * s;
+    const addrGap = 29 * s;
+    const addrFontSize = Math.round(21 * s);
     const lineGap = Math.round(28 * s);
 
     // Subtle drop shadow identical to TimeMark
@@ -480,7 +487,7 @@
     ctx.shadowOffsetY = 1.5 * s;
 
     // Wrap address text (matching exact break in photo)
-    ctx.font = `500 ${addrFontSize}px "Plus Jakarta Sans", -apple-system, sans-serif`;
+    ctx.font = `400 ${addrFontSize}px "Plus Jakarta Sans", -apple-system, sans-serif`;
     const maxAddrWidth = Math.min(imgW - margin * 2 - (150 * s), 560 * s);
     const addrLines = [];
     address.split('\n').forEach(part => {
@@ -489,26 +496,30 @@
     });
 
     // Total watermark height calculation
-    const totalHeight = clockHeight + (27 * s) + (addrLines.length * lineGap);
+    const totalHeight = clockHeight + addrGap + (addrLines.length * lineGap);
     const startX = margin;
     // Bottom alignment: sits exactly 25px * s above bottom edge
     const startY = imgH - totalHeight - (25 * s);
 
-    // 1. Draw Condensed Clock "04:07"
-    // Preferred font: Bebas Neue, then Barlow Condensed, then Oswald
-    ctx.font = `400 ${clockFontSize}px "Bebas Neue", "Barlow Condensed", "Oswald", sans-serif`;
+    // 1. Draw Slender Ultra-Condensed Clock "04:07"
+    // Using Teko / Bebas Neue with horizontal scale enforcement
+    const fontSize = Math.round(clockHeight * 1.15);
+    ctx.font = `500 ${fontSize}px "Teko", "Bebas Neue", "Barlow Condensed", sans-serif`;
+    const naturalWidth = ctx.measureText(timeStr).width;
+    const scaleX = targetClockWidth / naturalWidth; // Guaranteed slender ratio 2.20
+
+    ctx.save();
+    ctx.translate(startX, startY + clockHeight * 0.94);
+    ctx.scale(scaleX, 1);
     ctx.fillStyle = state.textColor;
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
-    ctx.fillText(timeStr, startX, startY + clockHeight * 0.94);
-
-    const timeWidth = ctx.measureText(timeStr).width;
+    ctx.fillText(timeStr, 0, 0);
+    ctx.restore();
 
     // 2. Draw Golden Amber Vertical Bar "|"
-    const barX = startX + timeWidth + (12 * s);
+    const barX = startX + targetClockWidth + barGap;
     const barY = startY;
-    const barWidth = 2.5 * s;
-    const barHeight = 75 * s;
 
     ctx.save();
     ctx.fillStyle = state.amberColor; // #FFC333
@@ -518,20 +529,22 @@
     ctx.restore();
 
     // 3. Draw Date & Day of Week
-    const textNextToBarX = barX + barWidth + (14 * s);
+    const textNextToBarX = barX + barWidth + dateGap;
 
-    // Line 1: Date "26 Tháng 10,2026"
-    ctx.font = `600 ${dateFontSize}px "Plus Jakarta Sans", sans-serif`;
+    // Line 1: Date "26 Tháng 10,2026" (Weight 500 regular, NOT bold)
+    const dateFontSize = Math.round(22 * s);
+    ctx.font = `500 ${dateFontSize}px "Plus Jakarta Sans", sans-serif`;
     ctx.fillStyle = state.textColor;
     ctx.fillText(dateStr, textNextToBarX, barY + dateFontSize * 0.92);
 
-    // Line 2: Day of Week "Thứ Hai" (aligned with bottom of amber bar)
-    ctx.font = `500 ${dayFontSize}px "Plus Jakarta Sans", sans-serif`;
+    // Line 2: Day of Week "Thứ Hai" (Weight 400 regular, aligned with bottom of bar)
+    const dayFontSize = Math.round(19 * s);
+    ctx.font = `400 ${dayFontSize}px "Plus Jakarta Sans", sans-serif`;
     ctx.fillText(dayStr, textNextToBarX, barY + barHeight - (2 * s));
 
-    // 4. Draw Address Lines below
-    let curAddrY = startY + clockHeight + (27 * s);
-    ctx.font = `500 ${addrFontSize}px "Plus Jakarta Sans", sans-serif`;
+    // 4. Draw Address Lines below (Weight 400 clean regular)
+    let curAddrY = startY + clockHeight + addrGap;
+    ctx.font = `400 ${addrFontSize}px "Plus Jakarta Sans", -apple-system, sans-serif`;
     ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
 
     addrLines.forEach(line => {
